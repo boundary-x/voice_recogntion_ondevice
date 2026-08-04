@@ -49,7 +49,9 @@ const MODELS = [
   {
     name: "한국어(SenseVoice)",
     files: [
-      'models/sense-voice-encoder-int8.onnx',
+      // 100MB가 넘는 메인 AI 엔진 파일 (GitHub Releases 외부 링크 적용)
+      'https://github.com/boundary-x/voice_recogntion_ondevice/releases/download/v1.0/sense-voice-encoder-int8.onnx',
+      // 용량이 작은 텍스트 변환 규칙 파일 (로컬 폴더 경로 유지)
       'models/chn_jpn_yue_eng_ko_spectok.bpe.model'
     ]
   }
@@ -130,12 +132,14 @@ async function loadSenseVoiceModel(modelData) {
       
       // 기기에 파일이 없다면 다운로드
       if (!response) {
-        recognitionStatus = `${filePath.split('/').pop()} 다운로드 중...`;
+        // 긴 URL 주소에서 파일 이름만 추출해서 화면에 표시
+        const fileName = filePath.split('/').pop();
+        recognitionStatus = `${fileName} 다운로드 중...`;
         displayRecognitionStatus();
         
         response = await fetch(filePath);
         if (response.ok) {
-          await cache.put(filePath, response.clone()); // 영구 저장
+          await cache.put(filePath, response.clone()); // 기기에 영구 저장
         } else {
           throw new Error("파일 로드 실패: " + filePath);
         }
@@ -149,8 +153,9 @@ async function loadSenseVoiceModel(modelData) {
     recognitionStatus = "AI 모델 준비 중...";
     displayRecognitionStatus();
 
-    // 저장된 파일에서 ONNX 세션 초기화
-    const encoderResponse = await cache.match('models/sense-voice-encoder-int8.onnx');
+    // 저장된 파일에서 ONNX 세션(AI 엔진) 초기화
+    // modelData.files[0] 은 용량이 가장 큰 ONNX 파일입니다.
+    const encoderResponse = await cache.match(modelData.files[0]);
     const modelBuffer = await encoderResponse.arrayBuffer();
     
     // WebAssembly를 사용하여 웹에서 가볍게 AI 엔진 실행

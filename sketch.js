@@ -49,9 +49,10 @@ const MODELS = [
   {
     name: "한국어(SenseVoice)",
     files: [
-      // 100MB가 넘는 메인 AI 엔진 파일 (GitHub Releases 외부 링크 적용)
-      'https://github.com/boundary-x/voice_recogntion_ondevice/releases/download/v1.0/sense-voice-encoder-int8.onnx',
-      // 용량이 작은 텍스트 변환 규칙 파일 (로컬 폴더 경로 유지)
+      // 끝에 있던 '?download=true'를 제거한 정확한 메인 AI 모델 링크입니다.
+      'https://huggingface.co/lovemefan/SenseVoice-onnx/resolve/main/sense-voice-encoder-int8.onnx',
+      
+      // bpe 파일은 용량이 작으므로 기존처럼 로컬 폴더 경로를 유지합니다.
       'models/chn_jpn_yue_eng_ko_spectok.bpe.model'
     ]
   }

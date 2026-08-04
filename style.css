@@ -1,0 +1,542 @@
+/* style.css - Boundary X: Final Modern Mono Tech (Responsive Updated) */
+
+:root {
+  /* Palette */
+  --primary: #000000;       /* 메인: 블랙 */
+  --primary-hover: #333333; /* 호버: 다크 그레이 */
+  --accent-grey: #F8F9FA;   /* 카드 배경: 아주 연한 회색 */
+  --border-color: #D1D5DB;  /* 테두리: 구분감 있는 회색 */
+
+  --bg-color: #FFFFFF;      /* 전체 배경: 화이트 */
+  --text-main: #111111;     /* 본문 텍스트 */
+  --text-sub: #666666;      /* 설명 텍스트 */
+
+  --danger: #EA4335;        /* 포인트/에러 컬러 (빨강) */
+  --success: #137333;       /* 성공 컬러 (녹색) */
+  --warning: #B7791F;       /* 로딩/대기 컬러 (황토색) */
+
+  /* Shapes */
+  --radius-pill: 50px;      /* 알약 모양 (완전 둥근 모서리) */
+  --radius-card: 16px;      /* 카드 모서리 */
+
+  --font-family: 'Pretendard', -apple-system, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+header {
+  background: #000000;
+  border-bottom: 1px solid #333;
+  padding: 1rem 5vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: padding 0.3s ease;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: font-size 0.3s ease;
+}
+
+.title img {
+  height: 28px;
+  width: auto;
+  transition: height 0.3s ease;
+}
+
+/* V2 뱃지 */
+.version-badge {
+  background: #FFFFFF;
+  color: #000000;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  line-height: 1.4;
+}
+
+.back-button {
+  text-decoration: none;
+  color: #FFFFFF;
+  border: 1px solid #FFFFFF;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1.2rem;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: #FFFFFF;
+  color: #000000;
+}
+
+/* Main Layout */
+main {
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  flex: 1;
+}
+
+.canvas-container, canvas { display: none; }
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.control-group {
+  background: var(--accent-grey);
+  padding: 2.5rem;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-color);
+}
+
+/* Title Style: Vertical Bar (Not a button) */
+.control-group h3 {
+  background: transparent;
+  color: #000000;
+  border-left: 6px solid #000000;
+  padding-left: 1rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+}
+
+.control-group p {
+  color: var(--text-sub);
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.9rem 1.5rem;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start-button {
+  background-color: var(--primary);
+  color: white;
+}
+.start-button:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+#bluetooth-control-buttons button {
+  min-width: 200px;
+  flex: 1;
+}
+
+.stop-button {
+  background-color: white;
+  color: var(--danger);
+  border: 1px solid var(--border-color);
+}
+.stop-button:hover {
+  background-color: #FFF5F5;
+  border-color: var(--danger);
+}
+
+.excel-button {
+  background-color: transparent;
+  color: #000000;
+  border: 1px solid #000000;
+}
+.excel-button:hover {
+  background-color: #333333;
+  color: #FFFFFF;
+  border-color: #333333;
+}
+
+/* Inputs */
+input,
+select {
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  font-size: 1rem;
+  background: #FFFFFF;
+  color: var(--text-main);
+  outline: none;
+}
+input:focus,
+select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+}
+select {
+  cursor: pointer;
+}
+
+/* 언어 선택 영역 */
+#language-select-container {
+  margin-bottom: 1rem;
+}
+
+/* Status Messages */
+#bluetoothStatus,
+#modelStatus {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-card);
+  font-size: 1rem;
+  text-align: center;
+  font-weight: 700;
+  background-color: #F1F3F4;
+  color: #333;
+  border: 1px solid var(--border-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Dynamic Status Colors */
+.status-connected {
+  background-color: #E6F4EA !important;
+  color: var(--success) !important;
+  border-color: var(--success) !important;
+}
+
+.status-error {
+  background-color: #FCE8E6 !important;
+  color: var(--danger) !important;
+  border-color: var(--danger) !important;
+}
+
+.status-loading {
+  background-color: #FEF6E6 !important;
+  color: var(--warning) !important;
+  border-color: var(--warning) !important;
+}
+
+/* 모델 로딩 진행률 바 */
+.progress-container {
+  margin-top: 0.75rem;
+  height: 10px;
+  width: 100%;
+  background-color: #E5E7EB;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: var(--primary);
+  transition: width 0.2s ease;
+}
+
+#recognitionStatus, #recognitionResult, #sentDataDisplay {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-card);
+  font-size: 0.95rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+#recognitionStatus {
+  background: none;
+  color: var(--text-sub);
+}
+
+#recognitionResult, #sentDataDisplay {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+/* Table */
+#command-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  background: white;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: #F1F3F4;
+  color: #333;
+  font-weight: 700;
+  text-align: left;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+tr:last-child td { border-bottom: none; }
+
+#user-command-ui {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+#user-command-ui input { flex: 2; }
+#user-command-ui button { flex: 1; min-width: 100px; }
+
+/* Voice UI */
+#voice-recognition-ui {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+/* Large Mic Button (120px) */
+.mic-button {
+  width: 120px !important;
+  height: 120px !important;
+  border-radius: 50% !important;
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mic-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.mic-button.active {
+  background: var(--danger);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 8px rgba(234, 67, 53, 0.2);
+}
+
+.mic-button svg {
+  width: 48px;
+  height: 48px;
+  fill: white;
+}
+
+/* 모델 로드 전 비활성화 상태 */
+.mic-button:disabled,
+.mic-button.disabled {
+  background: #BDBDBD;
+  cursor: not-allowed;
+  box-shadow: none;
+  pointer-events: none;
+}
+.mic-button:disabled:hover,
+.mic-button.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Detailed Footer */
+footer {
+  background-color: #000000;
+  color: #FFFFFF;
+  padding: 4rem 5vw 4rem;
+  border-top: 1px solid #222;
+  margin-top: auto;
+  font-size: 0.9rem;
+}
+
+.footer-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4rem;
+}
+
+.footer-info {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-logo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #FFFFFF;
+}
+
+/* Slogan Style */
+.slogan {
+  font-size: 0.95rem;
+  color: #CCCCCC;
+  font-weight: 400;
+  font-style: normal; /* No Italic */
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+address {
+  font-style: normal;
+  color: #888;
+  line-height: 1.6;
+}
+
+.copyright {
+  margin-top: 0.8rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.footer-links {
+  display: flex;
+  gap: 4rem;
+  flex-wrap: wrap;
+}
+
+.link-column h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 1.2rem;
+}
+
+.link-column ul {
+  list-style: none;
+  padding: 0;
+}
+
+.link-column li {
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-column a {
+  text-decoration: none;
+  color: #CCCCCC;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.link-column a:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.link-desc {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  /* Footer Layout Update */
+  .footer-top {
+    flex-direction: column;
+    gap: 3rem;
+  }
+  .footer-links {
+    gap: 2.5rem;
+    flex-direction: column;
+  }
+
+  /* 1. Header & Logo Resizing */
+  header {
+    padding: 0.8rem 1rem;
+  }
+
+  .title {
+    font-size: 1rem; /* 폰트 사이즈 축소 */
+    gap: 8px;
+  }
+
+  .title img {
+    height: 20px; /* 로고 이미지 높이 축소 (28px -> 20px) */
+  }
+
+  .version-badge {
+    font-size: 0.6rem;
+    padding: 2px 7px;
+  }
+
+  .back-button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  /* 2. Command Input UI: Vertical Layout */
+  #user-command-ui {
+    flex-direction: column; /* 세로 정렬 */
+    gap: 10px;
+  }
+
+  #user-command-ui input,
+  #user-command-ui button {
+    width: 100%; /* 가로 꽉 채우기 */
+    flex: none;  /* flex 비율 무시 */
+  }
+
+  /* Excel buttons full width for better touch targets */
+  .excel-button {
+    width: 100%;
+    margin-top: 5px;
+  }
+}

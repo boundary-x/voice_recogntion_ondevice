@@ -54,8 +54,8 @@ async function transmit(command){
  $('transmission').textContent=command+' 전송 중…';
  try{
   const bytes=new TextEncoder().encode(command+'\n');
-  if(characteristic.properties.write&&characteristic.writeValueWithResponse)await characteristic.writeValueWithResponse(bytes);
-  else if(characteristic.properties.writeWithoutResponse&&characteristic.writeValueWithoutResponse)await characteristic.writeValueWithoutResponse(bytes);
+  if(characteristic.properties?.write&&characteristic.writeValueWithResponse)await characteristic.writeValueWithResponse(bytes);
+  else if(characteristic.properties?.writeWithoutResponse&&characteristic.writeValueWithoutResponse)await characteristic.writeValueWithoutResponse(bytes);
   else await characteristic.writeValue(bytes);
   const message=command+' 전송 완료';$('transmission').textContent=message;return message;
  }catch(e){const message=command+' 전송 실패: '+e.message;$('transmission').textContent=message;return message;}
@@ -66,11 +66,12 @@ $('ble').onclick=async()=>{ $('ble').disabled=true;try{
  const selected=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'BBC micro:bit'}],optionalServices:['6e400001-b5a3-f393-e0a9-e50e24dcca9e']});device=selected;
  selected.addEventListener('gattserverdisconnected',()=>{if(device===selected){writeCharacteristic=null;$('bleStatus').textContent='연결 해제됨';}});
  const server=await selected.gatt.connect();const service=await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
- const characteristics=await service.getCharacteristics();
- writeCharacteristic=characteristics.find(c=>['6e400003-b5a3-f393-e0a9-e50e24dcca9e','6e400002-b5a3-f393-e0a9-e50e24dcca9e'].includes(c.uuid)&&(c.properties.write||c.properties.writeWithoutResponse));
- if(!writeCharacteristic)throw new Error('쓰기 가능한 UART 특성이 없습니다. 마이크로비트 예제 코드를 확인하세요');
+ // Match the existing micro:bit app: resolve the known receive UUID directly.
+ $('bleStatus').textContent='기기 연결됨 · UART 준비 중…';
+ writeCharacteristic=await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+ if(!selected.gatt.connected)throw new Error('UART 준비 중 기기 연결이 끊어졌습니다');
  $('bleStatus').textContent=selected.name+' 연결됨 · 명령 자동 전송 준비 완료';
- }catch(e){writeCharacteristic=null;device?.gatt.disconnect();$('bleStatus').textContent='연결 실패: '+e.message;}finally{$('ble').disabled=false;}};
+ }catch(e){writeCharacteristic=null;$('bleStatus').textContent=(device?.gatt.connected?'기기 연결 유지 · UART 준비 실패: ':'연결 실패: ')+(e.name||'Error')+' · '+e.message;}finally{$('ble').disabled=false;}};
 $('disconnect').onclick=()=>{writeCharacteristic=null;device?.gatt.disconnect();};
 $('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({environment,records},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='voice-check.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 window.addEventListener('pagehide',()=>{generation++;recording=false;cleanup();worker?.terminate();device?.gatt.disconnect();});

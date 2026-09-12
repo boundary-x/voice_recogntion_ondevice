@@ -7,14 +7,12 @@
 
   <link rel="icon" href="https://raw.githubusercontent.com/boundary-x/ai_teachable_machine/refs/heads/main/Favicon.png"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.dom.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
-  <!-- ONNX 웹 구동 라이브러리 추가 (Vosk 대체) -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
   
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
-  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="style.css?v=whisper-1">
 </head>
 <body>
   <header>
@@ -22,7 +20,7 @@
       <a href="https://boundaryx.io">
         <img src="https://raw.githubusercontent.com/boundary-x/ai_voice_recognition/refs/heads/main/boundaryx_logo.png" alt="Logo"></a>
       <span>AI 음성인식</span>
-      <span class="version-badge">V3</span>
+      <span class="version-badge">ON DEVICE</span>
     </div>
     <a href="https://boundaryx.io/59" class="back-button">돌아가기</a>
   </header>
@@ -34,7 +32,7 @@
       <!-- 1. 언어 및 모델 설정 (UI 유지) -->
       <div class="control-group" id="model-control-group">
         <h3>1. 언어 및 모델 설정</h3>
-        <p>음성 인식에 사용할 모델을 선택하세요. 첫 접속 시 기기에 안전하게 저장됩니다.</p>
+        <p>Whisper Base가 이 기기에서 음성을 인식합니다. 처음에는 모델 다운로드가 필요하며, 저장 공간에 따라 다시 다운로드할 수 있습니다.</p>
         <div id="language-select-container"></div>
         <div id="modelStatus">모델 상태: 대기 중</div>
         <div id="modelProgressContainer" class="progress-container">
@@ -68,9 +66,9 @@
       <!-- 5. 음성 제어 -->
       <div class="control-group" id="voice-recognition-group">
         <h3>5. 음성 제어</h3>
-        <p>버튼을 <b>누른 상태</b>에서 명령을 말하고, <b>떼면</b> 전송이 완료됩니다.</p>
+        <p>버튼을 <b>한 번 누르고</b> “지금 말하세요” 안내 후 말하세요. 말이 끝나면 인식된 명령을 자동 전송합니다. 다시 누르면 말하기를 마칩니다.</p>
         <div id="voice-recognition-ui"></div>
-        <div id="status-container"></div>
+        <div id="status-container" aria-live="polite"><div id="recognitionStatus"></div><div id="recognitionResult">인식 결과: —</div><div id="sentDataDisplay">전송 대기 중</div></div><p class="voice-hint">예: “앞으로 움직여” → forward. 여러 명령이 포함되면 사용자 명령 우선, 표 순서로 첫 일치 항목 하나를 전송합니다. 최대 8초간 듣습니다.</p>
       </div>
     </section>
   </main>
@@ -106,6 +104,7 @@
     </div>
   </footer>
 
-  <script src="sketch.js" defer></script>
+  <script src="command-ui.js?v=whisper-1" defer></script>
+  <script src="sketch.js?v=whisper-1" defer></script>
 </body>
 </html>

@@ -98,3 +98,7 @@ Matching is based on phrase inclusion, not sentence intent or negation. If multi
 Model and Bluetooth status panels use amber while preparing, green when ready/connected, red for errors, and neutral gray when idle/disconnected. Model failures display the reported error details and relevant retry guidance.
 
 Mouse, touch and keyboard (hold Space or Enter) are supported. Releasing before microphone readiness shows guidance and discards the input. Pointer cancellation or leaving the page cancels capture without submitting it.
+
+## In-app guide and support
+
+The header Help button opens a collapsible support card with a nine-step highlighted walkthrough, five MakeCode examples, two teaching resources, troubleshooting, and update notes. The guide follows the current hold-to-speak interaction and does not operate the controls. The header badge is V2. See [INTRO_PAGE_REVIEW.md](INTRO_PAGE_REVIEW.md) for the introduction page review and proposed Korean replacement copy.

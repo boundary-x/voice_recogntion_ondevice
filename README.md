@@ -1,31 +1,96 @@
-# Boundary X — On-device Voice Recognition
+# 🎙️ Boundary X - AI Voice Recognition (On-device)
 
-A browser-based micro:bit voice controller using multilingual Whisper Base, Transformers.js 3.8.1, and single-thread WASM (q8). Speech is transcribed on the device; model/runtime downloads need internet. Browser caching can reduce repeat downloads but does not guarantee permanent storage or offline startup. End users do not need Node.js or an API key.
+**Boundary X - AI Voice Recognition** is a web-based application that uses the multilingual **Whisper Base** model to convert speech into text directly on the user's device.
 
-## Usage
+It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending a mapped command when a registered phrase is included in the recognized text.
 
-1. Open the HTTPS app. On iPhone, use Bluefy for Bluetooth support.
-2. Select the recognition language and prepare the model.
-3. Connect a micro:bit running a compatible Nordic UART project.
-4. Tap the microphone once, wait for the listening message, then speak. Silence after speech, a second tap, or the eight-second limit ends capture.
-5. Check recognized text and transmission status. Cancel discards an unfinished utterance; canceling model inference requires reloading the model.
+![Project Status](https://img.shields.io/badge/Status-Active-success)
+![Platform](https://img.shields.io/badge/Platform-Web-blue)
+![Tech](https://img.shields.io/badge/Stack-p5.js%20%7C%20Transformers.js%20%7C%20Whisper-orange)
 
-The existing card layout, command table, custom command addition/deletion and Excel import/export are retained. The standalone `whisper-test/` page remains available for diagnostics.
+## ✨ Key Features
 
-## Command matching and transmission
+### 1. 🗣️ On-device Speech Recognition (Whisper Base)
+- **Local Processing:** Runs the quantized multilingual Whisper Base model through Transformers.js and single-thread WebAssembly. Audio is processed on the device rather than uploaded to a transcription service.
+- **Language Selection:** Supports Korean and English transcription. The built-in command phrases are Korean; add custom phrases to map English speech to hardware commands.
+- **Model Preparation:** Downloads the model and runtime when needed. Browser caching can reduce subsequent downloads, but permanent storage and offline startup are not guaranteed.
 
-Matching uses substring inclusion after Unicode normalization and whitespace removal. For example, `앞으로 움직여` matches `앞으로` and sends `forward\n`. Custom commands take priority; otherwise the first matching command in table order wins. Only one packet is sent per utterance, and a repeated utterance can send the same command again. This is keyword matching, not intent or negation analysis.
+### 2. 🔗 Wireless Control (Web Bluetooth API)
+- **Direct Connection:** Connects to a micro:bit running a compatible **Nordic UART Service** project. The app uses the direct receive-characteristic lookup verified in the Bluefy prototype.
+- **Phrase Matching:** Recognizes a command within a longer sentence. For example, "앞으로 움직여" contains "앞으로" and sends `forward`.
+- **Transmission Feedback:** Displays recognized text and transmission progress, success, or failure. Write completion does not confirm that the robot executed the command.
 
-Default outputs: `forward`, `backward`, `stop`, `left`, `right`, `ring`, `name`, `happy`, `angry`, `dance`. Custom data accepts printable ASCII without line breaks. Excel files use `Command` and `Data` columns; invalid rows are skipped. Export before leaving if you need to retain custom commands.
+### 3. 📝 Custom Commands & Excel Management
+- **Editable Mappings:** Add or delete custom voice phrases and their output data. Custom mappings take priority over built-in commands.
+- **Excel Import / Export:** Back up and restore custom mappings with `Command` and `Data` columns. Invalid import rows are skipped.
+- **Data Validation:** Output data accepts printable ASCII characters without line breaks. Export custom commands before leaving the page if you need to retain them.
 
-The micro:bit receive characteristic is resolved directly as `6e400003-b5a3-f393-e0a9-e50e24dcca9e` in service `6e400001-b5a3-f393-e0a9-e50e24dcca9e`, matching the Bluefy-tested connection path. UART initialization errors retain the connection and show the error instead of force-disconnecting. Success means the browser write completed, not that the robot executed the command. No automatic retries. A connection change during an utterance suppresses its pending transmission.
+### 4. 📱 Responsive UI & Clear Speaking Cues
+- **Familiar Layout:** Retains the card layout, command table, rounded buttons, and responsive styling of the voice recognition app.
+- **Tap to Speak:** Tap once, wait for the listening message, then speak. Silence after detected sound, another tap, or the eight-second limit ends capture and starts recognition.
+- **Cancel Support:** Cancel an unfinished utterance. Canceling inference stops the model worker and requires preparing the model again.
 
-## Deployment
+---
 
-Deploy `index.html`, `style.css`, `sketch.js`, `command-ui.js`, and `worker.js` together. Existing legacy model assets are retained but are not loaded by this version.
+## 🚀 Getting Started
 
-## Validation
+1. Open the [web app](https://boundary-x.github.io/voice_recogntion_ondevice/) over HTTPS. On iPhone, use **Bluefy** for Bluetooth connectivity.
+2. Select the recognition language and click **Prepare Model (모델 준비하기)**. Internet access is needed to download uncached model and runtime files.
+3. Load a compatible UART project onto the micro:bit and click **Connect Device (기기 연결)**.
+4. Tap the microphone once and wait for **Speak Now (지금 말하세요)** before speaking.
+5. Check the recognized text, transmission status, and the device's response.
 
-Desktop checks cover custom command creation/deletion, substring matching, repeated newline-delimited packets, simulated write failure, Excel import/export including numeric zero and invalid rows. Prior prototype Bluefy validation was reported successful by the user. Physical hardware validation of this integrated UI remains a follow-up; desktop simulated input does not measure classroom Korean accuracy.
+**No Node.js installation or API key is required for end users.** Microphone permission is required. Recognition can be tried without a Bluetooth connection, but data will not be sent.
 
-Integrated validation also exercised real Base inference with simulated microphone audio, result-to-BLE dispatch, suppression after connection changes, and 320/390/768/1280 pixel viewport overflow checks. The simulated audio test verifies execution, not recognition accuracy.
+## 📡 Communication Protocol
+
+After recognition, the app searches for registered phrases contained in the text. Matching normalizes Unicode and removes whitespace. Custom commands are checked first, followed by built-in commands in table order. **Only the first matching output is sent once per utterance.** Repeating the command in a new utterance sends it again.
+
+**Data Format:**
+```text
+{Mapped Command}\n
+```
+
+**Examples:**
+- **"앞으로 움직여" contains "앞으로":** `forward\n`
+- **"뒤로 가줘" contains "뒤로":** `backward\n`
+- **"멈춰 주세요" contains "멈춰":** `stop\n`
+- **No registered phrase is found:** No data is sent.
+- **Recording is canceled:** No new command is sent; cancellation does not send `stop`.
+
+**Built-in Commands:**
+
+| Voice Phrases | Output |
+| --- | --- |
+| 전진, 앞으로, 직진, 출발 | `forward` |
+| 뒤로, 후진 | `backward` |
+| 멈춰, 정지, 그만 | `stop` |
+| 좌회전, 왼쪽, 좌측 | `left` |
+| 우회전, 오른쪽, 우측 | `right` |
+| 사이렌, 소리, 경보 | `ring` |
+| 이름, 너의 이름 | `name` |
+| 안녕, 반가워 | `happy` |
+| 혼날래, 화났어 | `angry` |
+| 춤 춰, 춤춰, 댄스 | `dance` |
+
+Matching is based on phrase inclusion, not sentence intent or negation. If multiple commands occur in one sentence, the priority described above determines the output. A connection change during an utterance suppresses that utterance's pending transmission. Failed writes are not automatically retried.
+
+**Tech Stack:**
+- **Frontend:** HTML5, CSS3
+- **UI Library:** p5.js 1.6.0
+- **AI Engine:** Transformers.js 3.8.1 / multilingual Whisper Base (`q8`)
+- **Execution:** Web Worker / single-thread WebAssembly
+- **Audio Capture:** Web Audio API / microphone input
+- **Excel Files:** SheetJS
+- **Connectivity:** Web Bluetooth API (BLE / Nordic UART)
+
+**Validation:**
+- Desktop checks cover real model inference with simulated microphone input, phrase inclusion, custom commands, Excel import/export, simulated BLE writes and failures, and responsive viewport layouts.
+- The user verified the earlier prototype on Bluefy. Actual recognition accuracy, latency, and hardware behavior should be checked on the target devices with the integrated app.
+- The [comparison page](https://boundary-x.github.io/voice_recogntion_ondevice/whisper-test/) remains available for Base/Tiny testing.
+
+**License:**
+- Copyright © 2024 Boundary X Co. All rights reserved.
+- All rights to the application source code and design belong to BoundaryX. Third-party libraries and model weights remain subject to their respective licenses.
+- Web: [boundaryx.io](https://boundaryx.io)
+- Contact: [Boundary X](https://boundaryx.io/contact)

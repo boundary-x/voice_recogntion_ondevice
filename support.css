@@ -81,3 +81,6 @@ body.guide-active::after { content:''; height:60vh; flex-shrink:0; }
 @media(max-width:359px) { .title img { max-width:60px; } }
 
 @media(max-width:480px){.version-badge{display:inline-block;font-size:10px;padding:2px 4px}.title img{max-width:60px}.title{font-size:11px;gap:4px}.header-actions{gap:4px}.header-actions .back-button{padding:6px 8px}}
+
+#excel-command-actions { display:flex; flex-wrap:wrap; gap:12px; width:100%; }
+@media(max-width:768px){#excel-command-actions{flex-direction:column}}

@@ -58,7 +58,9 @@ function createUserCommandUI() {
     const importBtn = createButton("엑셀 불러오기").addClass("excel-button");
     importBtn.mousePressed(() => select("#excelInput").elt.click());
     
-    inputContainer.child(exportBtn).child(importBtn);
+    const excelActions = createDiv().id("excel-command-actions");
+    excelActions.child(exportBtn).child(importBtn);
+    inputContainer.child(excelActions);
   }
 }
 

@@ -27,7 +27,7 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 
 ### 4. 📱 Responsive UI & Clear Speaking Cues
 - **Familiar Layout:** Retains the card layout, command table, rounded buttons, and responsive styling of the voice recognition app.
-- **Tap to Speak:** Tap once, wait for the listening message, then speak. Tap the microphone again after speaking to end capture and start recognition. Silence does not submit audio. After 30 seconds without completion, capture is canceled without sending a command.
+- **Hold to Speak:** Hold the microphone button, wait for the listening message, and speak while holding. Release to end capture and start recognition. Silence does not submit audio. After 30 seconds without completion, capture is canceled without sending a command.
 - **Cancel Support:** Cancel an unfinished utterance. Canceling inference stops the model worker and requires preparing the model again.
 
 ---
@@ -37,7 +37,7 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 1. Open the [web app](https://boundary-x.github.io/voice_recogntion_ondevice/) over HTTPS. On iPhone, use **Bluefy** for Bluetooth connectivity.
 2. Select the recognition language and click **Prepare Model (모델 준비하기)**. Internet access is needed to download uncached model and runtime files.
 3. Load a compatible UART project onto the micro:bit and click **Connect Device (기기 연결)**.
-4. Tap the microphone once, wait for **Speak Now (지금 말하세요)**, speak, then tap again to finish.
+4. Hold the microphone button, wait for **Speak Now (지금 말하세요)**, speak while holding, then release.
 5. Check the recognized text, transmission status, and the device's response.
 
 **No Node.js installation or API key is required for end users.** Microphone permission is required. Recognition can be tried without a Bluetooth connection, but data will not be sent.
@@ -96,3 +96,5 @@ Matching is based on phrase inclusion, not sentence intent or negation. If multi
 - Contact: [Boundary X](https://boundaryx.io/contact)
 
 Model and Bluetooth status panels use amber while preparing, green when ready/connected, red for errors, and neutral gray when idle/disconnected. Model failures display the reported error details and relevant retry guidance.
+
+Mouse, touch and keyboard (hold Space or Enter) are supported. Releasing before microphone readiness shows guidance and discards the input. Pointer cancellation or leaving the page cancels capture without submitting it.

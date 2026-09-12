@@ -554,3 +554,5 @@ button:disabled { opacity:.45; cursor:default; }
 .voice-hint { margin-top:16px; }
 @media(max-width:480px){ .control-group {padding:20px;} main {padding:24px 16px;} .title {gap:6px;font-size:.85rem;} .title img {max-width:88px;object-fit:contain;} .version-badge {display:none;} }
 #user-command-ui .excel-button { flex:1 1 calc(50% - 12px); white-space:nowrap; }
+
+#mic { touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }

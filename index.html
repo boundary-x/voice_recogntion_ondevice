@@ -12,7 +12,7 @@
 
   
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
-  <link rel="stylesheet" type="text/css" href="style.css?v=whisper-3">
+  <link rel="stylesheet" type="text/css" href="style.css?v=2.1.0">
   <link rel="stylesheet" href="support.css?v=2">
 </head>
 <body>
@@ -32,12 +32,20 @@
     <section class="controls">
       <!-- 1. 언어 및 모델 설정 (UI 유지) -->
       <div class="control-group" id="model-control-group">
-        <h3>1. 언어 및 모델 설정</h3>
+        <h3>1. 음성 인식 방식</h3>
+        <p>접속 환경이나 원하는 사용 방식에 맞게 선택해주세요.</p>
+        <fieldset class="voice-modes"><legend class="sr-only">음성 인식 방식 선택</legend>
+          <label class="voice-mode"><input type="radio" name="voice-mode" value="webspeech" checked><span class="voice-mode-content"><span class="voice-purpose">PC·안드로이드 환경 권장</span><strong>Web Speech API</strong><small>말하는 동안 명령을 빠르게 인식하고 전송합니다.</small></span></label>
+          <label class="voice-mode"><input type="radio" name="voice-mode" value="whisper"><span class="voice-mode-content"><span class="voice-purpose">아이폰·아이패드 환경 권장</span><strong>Whisper</strong><small>말을 마친 뒤 음성을 분석하고 명령을 전송합니다. (인식 및 분석 시간 필요)</small></span></label>
+        </fieldset>
+        <p id="webspeech-info">모델 다운로드 없이 바로 시작하세요. PC·안드로이드 권장</p>
+        <div id="whisper-settings" hidden>
         <p>Whisper Base가 이 기기에서 음성을 인식합니다. 처음에는 모델 다운로드가 필요하며, 저장 공간에 따라 다시 다운로드할 수 있습니다.</p>
         <div id="language-select-container"></div>
         <div id="modelStatus">모델 상태: 대기 중</div>
         <div id="modelProgressContainer" class="progress-container">
           <div id="modelProgressBar" class="progress-bar"></div>
+        </div>
         </div>
       </div>
 
@@ -67,9 +75,9 @@
       <!-- 5. 음성 제어 -->
       <div class="control-group" id="voice-recognition-group">
         <h3>5. 음성 제어</h3>
-        <p><b>① 꾹 누르기 → ② 누른 채 말하기 → ③ 손 떼기</b><br>버튼을 누른 채 “지금 말하세요” 안내를 기다리세요. 말한 뒤 손을 떼면 음성을 분석하고 명령을 전송합니다.</p>
+        <p id="voice-instructions"><b>① 꾹 누르기 → ② 누른 채 말하기 → ③ 손 떼기</b><br>버튼을 누른 채 “지금 말하세요” 안내를 기다리세요. 말한 뒤 손을 떼면 음성을 분석하고 명령을 전송합니다.</p>
         <div id="voice-recognition-ui"></div>
-        <div id="status-container" aria-live="polite"><div id="recognitionStatus"></div><div id="recognitionResult">인식 결과: —</div><div id="sentDataDisplay">전송 대기 중</div></div><p class="voice-hint">예: “앞으로 움직여” → forward. 여러 명령이 포함되면 사용자 명령 우선, 표 순서로 첫 일치 항목 하나를 전송합니다. 30초 동안 완료하지 않으면 입력을 취소하며 전송하지 않습니다.</p>
+        <div id="status-container" aria-live="polite"><div id="recognitionStatus"></div><div id="recognitionResult">인식 결과: —</div><div id="sentDataDisplay">전송 대기 중</div></div><p class="voice-hint" id="voice-hint">예: “앞으로 움직여” → forward. 여러 명령이 포함되면 사용자 명령 우선, 표 순서로 첫 일치 항목 하나를 전송합니다. 30초 동안 완료하지 않으면 입력을 취소하며 전송하지 않습니다.</p>
       </div>
       <details id="support-card" class="control-group"></details>
     </section>
@@ -107,7 +115,9 @@
   </footer>
 
   <script src="command-ui.js?v=excel-guide-1" defer></script>
-  <script src="sketch.js?v=whisper-3" defer></script>
-  <script src="support.js?v=2" defer></script>
+  <script src="speech-session.js" defer></script>
+  <script src="sketch.js?v=2.1.0" defer></script>
+  <script src="support.js?v=2.1.0" defer></script>
 </body>
 </html>
+

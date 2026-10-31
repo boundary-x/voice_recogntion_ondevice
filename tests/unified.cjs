@@ -1,0 +1,30 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict'),path=require('path');
+const SpeechSession=require('../speech-session.js');
+const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{textContent:'',value:'korean',hidden:false,style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){}});return elements.get(id)};
+let latest,aborted=0,stopped=0;
+class Recognition{constructor(){latest=this;}start(){}abort(){aborted++;}stop(){stopped++;}}
+const context=vm.createContext({SpeechSession,document:{getElementById:el,querySelectorAll:()=>[]},window:{SpeechRecognition:Recognition,addEventListener(){}},setTimeout,clearTimeout,setInterval,clearInterval,console,TextEncoder,performance:{now:()=>0}});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../sketch.js'),'utf8'),context);
+const run=s=>vm.runInContext(s,context),tick=()=>new Promise(r=>setImmediate(r));
+const result=text=>({resultIndex:0,results:[[{transcript:text}]]});
+(async()=>{
+assert.equal(run('voiceMode'),'webspeech');assert.equal(run('voiceReady()'),true);
+run("renderVoiceMode(); userCommands['테스트']=['TEST']; device={gatt:{connected:true}}; globalThis.sent=[]; characteristic={writeValue:async bytes=>sent.push(new TextDecoder().decode(bytes))};");
+context.TextDecoder=TextDecoder;
+run('startRecording()');latest.onstart();latest.onresult(result('앞으로 움직여'));latest.onresult(result('앞으로 움직여'));await tick();
+assert.deepEqual([...run('sent')],['forward\n']);assert.equal(run('phase'),'listening');
+await run('stopRecording()');assert.equal(stopped,1);latest.onend();assert.equal(run('phase'),'idle');
+console.log('PASS browser mode sends before release; duplicates suppressed; release ends session');
+run('startRecording()');latest.onstart();const stale=latest;
+await run("switchVoiceMode('whisper')");stale.onresult(result('뒤로'));await tick();
+assert.equal(run('sent.length'),1);assert.equal(run("userCommands['테스트'][0]"),'TEST');assert.equal(run('device.gatt.connected'),true);assert.equal(el('whisper-settings').hidden,false);assert.equal(run('voiceReady()'),false);
+console.log('PASS switching cancels late results and preserves commands/BLE');
+await run("switchVoiceMode('webspeech')");run('startRecording()');latest.onstart();latest.onresult(result('뒤로'));await run("switchVoiceMode('whisper')");await tick();assert.equal(run('sent.length'),1);
+console.log('PASS queued command discarded after mode change');
+run("modelReady=true;worker={terminate(){throw Error('ready model should be retained')}};");await run("switchVoiceMode('webspeech')");await run("switchVoiceMode('whisper')");assert.equal(run('modelReady'),true);
+console.log('PASS prepared Whisper model remains reusable');
+await run("switchVoiceMode('webspeech')");run('startRecording()');latest.onstart();run('linkEpoch++');latest.onresult(result('앞으로'));await tick();assert.equal(run('sent.length'),1);await run("cancel('취소')");
+context.window.SpeechRecognition=undefined;run('startRecording()');assert.match(el('recognitionStatus').textContent,/Whisper/);assert.equal(run('phase'),'idle');
+console.log('PASS changed connection blocks sends; unavailable API guides manual Whisper selection');
+})().catch(e=>{console.error(e);process.exitCode=1;});
+

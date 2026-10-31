@@ -4,6 +4,8 @@ const UART_SERVICE_UUID='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const UART_RX_CHARACTERISTIC_UUID='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const voiceCommands={forward:['전진','앞으로','직진','출발'],backward:['뒤로','후진'],stop:['멈춰','정지','그만'],left:['좌회전','왼쪽','좌측'],right:['우회전','오른쪽','우측'],ring:['사이렌','소리','경보'],name:['이름','너의 이름'],happy:['안녕','반가워'],angry:['혼날래','화났어'],dance:['춤 춰','춤춰','댄스']};
 let heldPointer=null, heldKey=null;
+let voiceMode='webspeech', speechSession=null, speechSent=new Set(), speechQueue=Promise.resolve(), speechTimer=null, speechRequest=null;
+const voiceReady=()=>voiceMode==='webspeech'||modelReady;
 let userCommands=Object.create(null);
 let worker,modelReady=false,modelLoading=false,phase='idle',epoch=0,linkEpoch=0,requestId=0,activeRequest=null;
 let device=null,characteristic=null,connecting=false,stream,context,source,processor,gain,timer,chunks=[],voiced=false,lastVoice=0,startTime=0;
@@ -13,7 +15,7 @@ function stateBox(id,type,text){const el=$(id);el.classList.remove('status-conne
 function modelError(message){const detail=String(message||'브라우저에서 오류 상세를 제공하지 않았습니다.');let hint='모델 준비하기를 눌러 다시 시도해주세요.';if(/fetch|network|download|404|403|Failed to load/i.test(detail))hint='인터넷 연결 또는 모델 파일 접근 상태를 확인해주세요.';else if(/memory|allocation|out of bounds/i.test(detail))hint='다른 탭을 닫고 다시 시도해주세요.';return '모델 준비 실패: '+detail+' · '+hint;}
 function status(text){$('recognitionStatus').textContent=text;}
 function controls(){
- const busy=phase!=='idle';$('mic').disabled=!modelReady||(busy&&!['starting','listening'].includes(phase));$('mic').classList.toggle('active',phase==='listening');$('mic').classList.toggle('starting',phase==='starting');
+ const busy=phase!=='idle';$('mic').disabled=!voiceReady()||(busy&&!['starting','listening'].includes(phase));$('mic').classList.toggle('active',phase==='listening');$('mic').classList.toggle('starting',phase==='starting');
  const label=phase==='starting'?'준비 중 · 계속 누르세요':phase==='listening'?'말한 뒤 손을 떼세요':phase==='processing'?'인식 중…':phase==='sending'?'전송 중…':'누르고 말하기';$('mic').setAttribute('aria-label',label);$('mic-label').textContent=label;
  $('cancel-voice').disabled=!busy||phase==='sending';$('load-model').disabled=modelLoading||busy||modelReady;$('language').disabled=busy;
  $('connect').disabled=connecting; $('disconnect').disabled=!device;
@@ -24,17 +26,18 @@ function setup(){
  $('language-select-container').innerHTML='<select id="language" class="language-select" aria-label="인식 언어"><option value="korean">한국어 · Whisper Base</option><option value="english">English · Whisper Base</option></select><button id="load-model" class="start-button">모델 준비하기</button>';
  $('bluetooth-control-buttons').innerHTML='<button id="connect" class="start-button">기기 연결</button><button id="disconnect" class="stop-button">연결 해제</button>';
  $('voice-recognition-ui').innerHTML='<button id="mic" class="mic-button" aria-label="눌러서 말하기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14c1.66 0 3-1.34 3-3V5a3 3 0 0 0-6 0v6c0 1.66 1.34 3 3 3zM17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></button><span id="mic-label"></span><button id="cancel-voice" class="stop-button">취소</button>';
+ document.querySelectorAll('[name=voice-mode]').forEach(input=>input.addEventListener('change',()=>switchVoiceMode(input.value)));
  $('load-model').onclick=prepareVoiceModel;bindHoldInput();$('cancel-voice').onclick=()=>cancel('취소했습니다. 다시 말할 수 있어요.');$('connect').onclick=connectBluetooth;$('disconnect').onclick=disconnectBluetooth;
- stateBox('modelStatus','idle','상태: 모델 준비 전');status('모델을 준비한 뒤 마이크 버튼을 누르세요.');controls();
+ stateBox('modelStatus','idle','상태: 모델 준비 전');renderVoiceMode();controls();
 }
 function bindHoldInput(){
  const mic=$('mic');
  const release=()=>{if(phase==='starting')cancel('너무 빨리 떼었어요. 준비 안내가 나올 때까지 누른 채 기다리고 말해주세요.');else if(phase==='listening')stopRecording();};
- mic.addEventListener('pointerdown',e=>{if(e.button!==0||!e.isPrimary||phase!=='idle'||!modelReady||heldKey!==null)return;e.preventDefault();heldPointer=e.pointerId;mic.setPointerCapture(e.pointerId);startRecording();});
+ mic.addEventListener('pointerdown',e=>{if(e.button!==0||!e.isPrimary||phase!=='idle'||!voiceReady()||heldKey!==null)return;e.preventDefault();heldPointer=e.pointerId;mic.setPointerCapture(e.pointerId);startRecording();});
  mic.addEventListener('pointerup',e=>{if(e.pointerId!==heldPointer)return;e.preventDefault();heldPointer=null;release();});
  const abort=e=>{if(e.pointerId!==heldPointer)return;heldPointer=null;if(['starting','listening'].includes(phase))cancel('입력이 취소되었습니다. 버튼을 다시 누르고 말해주세요.');};
  mic.addEventListener('pointercancel',abort);mic.addEventListener('lostpointercapture',abort);
- mic.addEventListener('keydown',e=>{if(![' ','Enter'].includes(e.key))return;e.preventDefault();if(e.repeat||heldKey!==null||heldPointer!==null||phase!=='idle'||!modelReady)return;heldKey=e.key;startRecording();});
+ mic.addEventListener('keydown',e=>{if(![' ','Enter'].includes(e.key))return;e.preventDefault();if(e.repeat||heldKey!==null||heldPointer!==null||phase!=='idle'||!voiceReady())return;heldKey=e.key;startRecording();});
  mic.addEventListener('keyup',e=>{if(e.key!==heldKey)return;e.preventDefault();heldKey=null;release();});
  mic.addEventListener('contextmenu',e=>e.preventDefault());
  mic.addEventListener('blur',()=>{if(heldKey!==null){heldKey=null;cancel('입력이 취소되었습니다.');}});
@@ -42,7 +45,7 @@ function bindHoldInput(){
  window.addEventListener('blur',leave);document.addEventListener('visibilitychange',()=>{if(document.hidden)leave();});
 }
 function prepareVoiceModel(){
- if(modelLoading)return;worker?.terminate();const currentWorker=new Worker('./worker.js?v=whisper-1',{type:'module'});worker=currentWorker;modelLoading=true;modelReady=false;controls();stateBox('modelStatus','loading','상태: 모델 다운로드 및 준비 중…');$('modelProgressBar').style.width='0%';
+ if(modelLoading||voiceMode!=='whisper')return;worker?.terminate();const currentWorker=new Worker('./worker.js?v=whisper-1',{type:'module'});worker=currentWorker;modelLoading=true;modelReady=false;controls();stateBox('modelStatus','loading','상태: 모델 다운로드 및 준비 중…');$('modelProgressBar').style.width='0%';
  currentWorker.onerror=e=>{if(worker!==currentWorker)return;modelLoading=false;modelReady=false;phase='idle';stateBox('modelStatus','error',modelError(e.message));status('모델 상태창의 오류 내용을 확인해주세요.');controls();};
  currentWorker.onmessage=async({data:d})=>{
  if(worker!==currentWorker)return;
@@ -56,7 +59,7 @@ function prepareVoiceModel(){
  const command=matchCommand(text,request.commands);
  if(!command){$('sentDataDisplay').textContent='미전송: 등록된 명령어가 없습니다';finish(text?'등록된 명령어를 포함해 다시 말해주세요.':'말소리를 인식하지 못했어요.');return;}
  if(request.link!==linkEpoch){$('sentDataDisplay').textContent='미전송: 인식 중 기기 연결이 변경되었습니다';finish('다시 말해주세요.');return;}
- phase='sending';status('명령을 전송하고 있어요…');controls();await sendBluetoothData(command);if(request.epoch===epoch)finish('인식 완료 · 다시 말할 수 있어요.');
+ phase='sending';status('명령을 전송하고 있어요…');controls();await sendBluetoothData(command,()=>request.epoch===epoch&&request.link===linkEpoch);if(request.epoch===epoch)finish('인식 완료 · 다시 말할 수 있어요.');
  }
  };
  currentWorker.postMessage({type:'load',model:'base'});
@@ -70,12 +73,14 @@ async function releaseAudio(){
  clearInterval(timer);const ctx=context;stream?.getTracks().forEach(t=>t.stop());processor?.disconnect();source?.disconnect();gain?.disconnect();stream=context=processor=source=gain=null;if(ctx&&ctx.state!=='closed')await ctx.close();
 }
 async function cancel(message){
+ clearTimeout(speechTimer);speechSession?.cancel();speechRequest=null;
  heldPointer=null;heldKey=null;epoch++;activeRequest=null;const oldPhase=phase;phase='canceling';controls();await releaseAudio();chunks=[];
- if(oldPhase==='processing'){worker?.terminate();worker=null;modelReady=false;stateBox('modelStatus','idle','분석 취소됨 · 모델을 다시 준비해주세요');}
+ if(oldPhase==='processing'&&voiceMode==='whisper'){worker?.terminate();worker=null;modelReady=false;stateBox('modelStatus','idle','분석 취소됨 · 모델을 다시 준비해주세요');}
  finish(message);
 }
 async function startRecording(){
- if(phase!=='idle'||!modelReady)return;phase='starting';const current=++epoch;activeRequest={epoch:current,link:linkEpoch,commands:commandSnapshot()};$('recognitionResult').textContent='인식 결과: —';$('sentDataDisplay').textContent='전송 대기 중';status('마이크 준비 중… 계속 누르고 계세요.');controls();
+ if(voiceMode==='webspeech'){startBrowserSpeech();return;}
+ if(phase!=='idle'||!voiceReady())return;phase='starting';const current=++epoch;activeRequest={epoch:current,link:linkEpoch,commands:commandSnapshot()};$('recognitionResult').textContent='인식 결과: —';$('sentDataDisplay').textContent='전송 대기 중';status('마이크 준비 중… 계속 누르고 계세요.');controls();
  try{
  if(!navigator.mediaDevices?.getUserMedia)throw Error('HTTPS 주소와 마이크 지원 여부를 확인하세요');
  const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});if(current!==epoch){audio.getTracks().forEach(t=>t.stop());return;}stream=audio;
@@ -89,6 +94,7 @@ async function startRecording(){
  }catch(e){if(current!==epoch)return;await releaseAudio();activeRequest=null;finish('마이크를 열 수 없습니다: '+e.message);}
 }
 async function stopRecording(){
+ if(voiceMode==='webspeech'){if(phase==='listening'){phase='processing';status('마지막 인식 결과를 확인하고 있습니다…');controls();try{speechSession?.stop();}catch{finish('다시 말해주세요.');}clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('입력을 마쳤습니다. 다시 말할 수 있어요.'),8000);}return;}
  if(phase!=='listening')return;phase='processing';controls();status('음성을 분석하고 있어요…');const current=epoch,rate=context.sampleRate,hasVoice=voiced;
  const merged=new Float32Array(chunks.reduce((n,c)=>n+c.length,0));let offset=0;for(const chunk of chunks){merged.set(chunk,offset);offset+=chunk.length;}
  await releaseAudio();if(current!==epoch)return;
@@ -106,11 +112,60 @@ async function connectBluetooth(){
  }catch(e){characteristic=null;stateBox('bluetoothStatus','error',(device?.gatt.connected?'기기 연결 유지 · UART 준비 실패: ':'연결 실패: ')+e.message);}finally{connecting=false;controls();}
 }
 function disconnectBluetooth(){linkEpoch++;characteristic=null;device?.gatt.disconnect();device=null;stateBox('bluetoothStatus','idle','상태: 연결 해제됨');controls();}
-async function sendBluetoothData(data){
+async function sendBluetoothData(data, isCurrent=()=>true){
+ if(!isCurrent())return false;
  const c=characteristic;if(!c||!device?.gatt.connected){$('sentDataDisplay').textContent='미전송: 기기를 연결해주세요';return false;}
  $('sentDataDisplay').textContent='전송 중: '+data;
- try{const bytes=new TextEncoder().encode(data+'\n');if(c.properties?.write&&c.writeValueWithResponse)await c.writeValueWithResponse(bytes);else if(c.properties?.writeWithoutResponse&&c.writeValueWithoutResponse)await c.writeValueWithoutResponse(bytes);else await c.writeValue(bytes);$('sentDataDisplay').textContent='전송 완료: '+data;return true;}catch(e){$('sentDataDisplay').textContent='전송 실패: '+data+' · '+e.message;return false;}
+ try{const bytes=new TextEncoder().encode(data+'\n');if(c.properties?.write&&c.writeValueWithResponse)await c.writeValueWithResponse(bytes);else if(c.properties?.writeWithoutResponse&&c.writeValueWithoutResponse)await c.writeValueWithoutResponse(bytes);else await c.writeValue(bytes);if(isCurrent())$('sentDataDisplay').textContent='전송 완료: '+data;return true;}catch(e){if(isCurrent())$('sentDataDisplay').textContent='전송 실패: '+data+' · '+e.message;return false;}
 }
-window.addEventListener('pagehide',()=>{epoch++;activeRequest=null;phase='idle';releaseAudio();worker?.terminate();worker=null;modelReady=modelLoading=false;disconnectBluetooth();});
-window.addEventListener('pageshow',e=>{if(e.persisted){stateBox('modelStatus','idle','모델을 다시 준비해주세요');controls();}});
+function renderVoiceMode(){
+ const browser=voiceMode==='webspeech';
+ $('whisper-settings').hidden=browser;$('webspeech-info').hidden=!browser;
+ $('voice-instructions').textContent=browser?'버튼을 누른 채 “지금 말하세요” 안내 후 말하세요. 명령이 인식되면 바로 전송합니다.':'버튼을 누른 채 “지금 말하세요” 안내 후 말하고 손을 떼세요. 분석 후 전송합니다.';
+ $('voice-hint').textContent=browser?'예: “앞으로 움직여” → forward. 같은 데이터는 한 번 누르는 동안 한 번만 전송합니다. 손을 떼거나 취소해도 로봇 정지 명령은 보내지 않습니다.':'예: “앞으로 움직여” → forward. 여러 명령이 포함되면 첫 일치 항목 하나를 전송합니다. 30초가 지나면 전송 없이 입력을 취소합니다.';
+ status(browser?'마이크 버튼을 누른 채 말하세요.':modelReady?'모델 준비 완료 · 누른 채 말하고 손을 떼세요.':'모델을 준비한 뒤 마이크 버튼을 누르세요.');
+}
+async function switchVoiceMode(mode){
+ if(!['webspeech','whisper'].includes(mode)||mode===voiceMode)return;
+ const radios=[...document.querySelectorAll('[name=voice-mode]')];radios.forEach(r=>r.disabled=true);
+ try{
+   await cancel('인식 방식을 변경하고 있습니다…');
+   if(modelLoading){worker?.terminate();worker=null;modelReady=modelLoading=false;stateBox('modelStatus','idle','모델 준비 전 · 모델 준비하기를 눌러주세요');$('modelProgressBar').style.width='0%';}
+   voiceMode=mode;renderVoiceMode();controls();
+   $('recognitionResult').textContent='인식 결과: —';$('sentDataDisplay').textContent='전송 대기 중';
+ }finally{radios.forEach(r=>{r.disabled=false;r.checked=r.value===voiceMode;});}
+}
+function startBrowserSpeech(){
+ if(phase!=='idle')return;
+ const current=++epoch, link=linkEpoch, commands=commandSnapshot();
+ const valid=()=>epoch===current&&voiceMode==='webspeech';
+ phase='starting';speechSent=new Set();speechRequest={epoch:current,link};
+ $('recognitionResult').textContent='인식 결과: —';$('sentDataDisplay').textContent='전송 대기 중';
+ status('마이크 준비 중… 계속 누르고 계세요.');controls();
+ try{
+   // Resume audio inside the press gesture so the ready beep can play on mobile.
+   try{context=new (window.AudioContext||window.webkitAudioContext)();context.resume().catch(()=>{});}catch{}
+   speechSession=new SpeechSession(window.SpeechRecognition||window.webkitSpeechRecognition,{
+     start(){if(!valid())return;phase='listening';status('지금 말하세요! · 명령이 인식되면 바로 전송합니다.');controls();
+       try{const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}catch{}
+       clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);
+     },
+     result(text){if(!valid())return;$('recognitionResult').textContent='인식 결과: '+text;
+       const command=matchCommand(text,commands);if(!command||speechSent.has(command))return;
+       if(link!==linkEpoch){$('sentDataDisplay').textContent='미전송: 기기 연결이 변경되었습니다. 다시 말해주세요.';return;}
+       speechSent.add(command);
+       speechQueue=speechQueue.catch(()=>{}).then(()=>sendBluetoothData(command,()=>valid()&&link===linkEpoch));
+     },
+     error(code){if(!valid())return;clearTimeout(speechTimer);epoch++;speechRequest=null;releaseAudio();
+       finish(code==='network'?'음성 인식 서비스에 연결하지 못했습니다. Chrome에서 열고 인터넷 연결을 확인한 뒤 다시 시도해주세요. 계속 실패하면 Whisper를 선택해주세요.':code==='not-allowed'?'마이크 권한을 허용한 뒤 다시 시도해주세요.':code==='no-speech'?'말소리를 감지하지 못했어요. 다시 말해주세요.':'음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요. ('+code+')');
+     },
+     end(){if(!valid())return;clearTimeout(speechTimer);speechRequest=null;releaseAudio();finish('입력을 마쳤습니다. 다시 누르고 말할 수 있어요.');}
+   });
+   speechSession.start('ko-KR');
+   speechTimer=setTimeout(()=>cancel('음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요.'),10000);
+ }catch(e){epoch++;speechSession?.cancel();releaseAudio();finish(e.message);}
+}
+window.addEventListener('pagehide',()=>{speechSession?.cancel();clearTimeout(speechTimer);epoch++;activeRequest=null;phase='idle';releaseAudio();worker?.terminate();worker=null;modelReady=modelLoading=false;disconnectBluetooth();});
+window.addEventListener('pageshow',e=>{if(e.persisted){stateBox('modelStatus','idle','모델을 다시 준비해주세요');renderVoiceMode();controls();}});
+
 

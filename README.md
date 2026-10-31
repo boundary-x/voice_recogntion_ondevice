@@ -1,6 +1,6 @@
-# 🎙️ Boundary X - AI Voice Recognition (On-device)
+# 🎙️ Boundary X - AI Voice Recognition
 
-**Boundary X - AI Voice Recognition** is a web-based application that uses the multilingual **Whisper Base** model to convert speech into text directly on the user's device.
+**Boundary X - AI Voice Recognition** is a web-based application that offers **Web Speech API** recognition (default) and on-device **Whisper Base** recognition in one interface.
 
 It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending a mapped command when a registered phrase is included in the recognized text.
 
@@ -10,7 +10,10 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 
 ## ✨ Key Features
 
-### 1. 🗣️ On-device Speech Recognition (Whisper Base)
+### 1. 🗣️ Selectable Speech Recognition
+- **Web Speech API (default):** Korean browser-based recognition sends matching commands while the button is held. PC/Android is recommended. Service availability depends on the browser and network; audio may be processed by the browser provider.
+- **Whisper Base:** Recommended for iPhone/iPad with Bluefy. Hold to record, release to analyze and send. Analysis time depends on the device.
+- **Manual Selection:** Both choices remain available on every device. Switching cancels pending recognition while preserving custom commands and the Bluetooth connection.
 - **Local Processing:** Runs the quantized multilingual Whisper Base model through Transformers.js and single-thread WebAssembly. Audio is processed on the device rather than uploaded to a transcription service.
 - **Language Selection:** Supports Korean and English transcription. The built-in command phrases are Korean; add custom phrases to map English speech to hardware commands.
 - **Model Preparation:** Downloads the model and runtime when needed. Browser caching can reduce subsequent downloads, but permanent storage and offline startup are not guaranteed.
@@ -27,15 +30,15 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 
 ### 4. 📱 Responsive UI & Clear Speaking Cues
 - **Familiar Layout:** Retains the card layout, command table, rounded buttons, and responsive styling of the voice recognition app.
-- **Hold to Speak:** Hold the microphone button, wait for the listening message, and speak while holding. Release to end capture and start recognition. Silence does not submit audio. After 30 seconds without completion, capture is canceled without sending a command.
-- **Cancel Support:** Cancel an unfinished utterance. Canceling inference stops the model worker and requires preparing the model again.
+- **Hold to Speak:** Hold the microphone button, wait for the listening message, and speak while holding. Web Speech recognizes and sends while speaking; release ends input. Whisper starts analysis after release. Sessions are limited to 30 seconds. Commands already sent by Web Speech cannot be undone.
+- **Cancel Support:** Cancel an unfinished utterance. Canceling Whisper inference stops the model worker and requires preparing the model again. Canceling Web Speech discards pending results but does not undo completed transmissions.
 
 ---
 
 ## 🚀 Getting Started
 
 1. Open the [web app](https://boundary-x.github.io/voice_recogntion_ondevice/) over HTTPS. On iPhone, use **Bluefy** for Bluetooth connectivity.
-2. Select the recognition language and click **Prepare Model (모델 준비하기)**. Internet access is needed to download uncached model and runtime files.
+2. Choose an engine. Web Speech needs no model download. For Whisper, choose Korean or English and click **Prepare Model (모델 준비하기)**; internet access is needed for uncached files.
 3. Load a compatible UART project onto the micro:bit and click **Connect Device (기기 연결)**.
 4. Hold the microphone button, wait for **Speak Now (지금 말하세요)**, speak while holding, then release.
 5. Check the recognized text, transmission status, and the device's response.
@@ -44,7 +47,7 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 
 ## 📡 Communication Protocol
 
-After recognition, the app searches for registered phrases contained in the text. Matching normalizes Unicode and removes whitespace. Custom commands are checked first, followed by built-in commands in table order. **Only the first matching output is sent once per utterance.** Repeating the command in a new utterance sends it again.
+After recognition, the app searches for registered phrases contained in the text. Matching normalizes Unicode and removes whitespace. Custom commands are checked first, followed by built-in commands in table order. Whisper sends the first matching output once after analysis. Web Speech checks each incoming result and sends each distinct matching output at most once per press session. A new session can send the same output again.
 
 **Data Format:**
 ```text
@@ -85,7 +88,8 @@ Matching is based on phrase inclusion, not sentence intent or negation. If multi
 - **Connectivity:** Web Bluetooth API (BLE / Nordic UART)
 
 **Validation:**
-- Desktop checks cover real model inference with simulated microphone input, phrase inclusion, custom commands, Excel import/export, simulated BLE writes and failures, and responsive viewport layouts.
+- The unified-engine tests cover default selection, immediate command dispatch, duplicate suppression, stale-result cancellation, queued-send cancellation, connection changes, and preservation of custom commands and prepared Whisper state. Browser checks cover both engine UIs and all ten walkthrough steps.
+- Real speech latency and physical BLE behavior of this integrated release still require target-device testing. The in-app test browser reported a Web Speech network error; Chrome/network guidance is shown for that case.
 - The user verified the earlier prototype on Bluefy. Actual recognition accuracy, latency, and hardware behavior should be checked on the target devices with the integrated app.
 - The [comparison page](https://boundary-x.github.io/voice_recogntion_ondevice/whisper-test/) remains available for Base/Tiny testing.
 
@@ -97,8 +101,9 @@ Matching is based on phrase inclusion, not sentence intent or negation. If multi
 
 Model and Bluetooth status panels use amber while preparing, green when ready/connected, red for errors, and neutral gray when idle/disconnected. Model failures display the reported error details and relevant retry guidance.
 
-Mouse, touch and keyboard (hold Space or Enter) are supported. Releasing before microphone readiness shows guidance and discards the input. Pointer cancellation or leaving the page cancels capture without submitting it.
+Mouse, touch and keyboard (hold Space or Enter) are supported. Releasing before microphone readiness shows guidance and discards the input. Pointer cancellation or leaving the page cancels pending input. Previously transmitted Web Speech commands are not reversed.
 
 ## In-app guide and support
 
-The header Help button opens a collapsible support card with a nine-step highlighted walkthrough, five MakeCode examples, two teaching resources, troubleshooting, and update notes. The guide follows the current hold-to-speak interaction and does not operate the controls. The header badge is V2. See [INTRO_PAGE_REVIEW.md](INTRO_PAGE_REVIEW.md) for the introduction page review and proposed Korean replacement copy.
+The header Help button opens a collapsible support card with a ten-step highlighted walkthrough that adapts to the selected engine, five MakeCode examples, two teaching resources, troubleshooting, and update notes. The guide follows the current hold-to-speak interaction and does not operate the controls. The header badge is V2. See [INTRO_PAGE_REVIEW.md](INTRO_PAGE_REVIEW.md) for the introduction page review and proposed Korean replacement copy.
+

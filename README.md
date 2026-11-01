@@ -29,6 +29,7 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 - **Data Validation:** Output data accepts printable ASCII characters without line breaks. Export custom commands before leaving the page if you need to retain them.
 
 ### 4. 📱 Responsive UI & Clear Speaking Cues
+- **Live Feedback:** Engine-specific step indicators, a ready beep and red microphone, and an audio-level ring clarify when to speak. Whisper shows a loading indicator during analysis. Successful Bluetooth writes briefly highlight the output; offline previews do not show a success highlight. The optional Web Speech audio meter falls back to a static ring if unavailable. Reduced-motion settings disable ring motion and spinner rotation.
 - **Familiar Layout:** Retains the card layout, command table, rounded buttons, and responsive styling of the voice recognition app.
 - **Hold to Speak:** Hold the microphone button, wait for the listening message, and speak while holding. Web Speech recognizes and sends while speaking; release ends input. Whisper starts analysis after release. Sessions are limited to 30 seconds. Commands already sent by Web Speech cannot be undone.
 - **Cancel Support:** Cancel an unfinished utterance. Canceling Whisper inference stops the model worker and requires preparing the model again. Canceling Web Speech discards pending results but does not undo completed transmissions.
@@ -106,4 +107,5 @@ Mouse, touch and keyboard (hold Space or Enter) are supported. Releasing before 
 ## In-app guide and support
 
 The header Help button opens a collapsible support card with a ten-step highlighted walkthrough that adapts to the selected engine, five MakeCode examples, two teaching resources, troubleshooting, and update notes. The guide follows the current hold-to-speak interaction and does not operate the controls. The header badge is V2. See [INTRO_PAGE_REVIEW.md](INTRO_PAGE_REVIEW.md) for the introduction page review and proposed Korean replacement copy.
+
 

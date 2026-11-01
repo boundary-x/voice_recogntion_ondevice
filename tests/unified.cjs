@@ -1,9 +1,12 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict'),path=require('path');
 const SpeechSession=require('../speech-session.js');
-const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{textContent:'',value:'korean',hidden:false,style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){}});return elements.get(id)};
+const elements=new Map();
+const makeElement=()=>({textContent:'',value:'korean',hidden:false,dataset:{},children:[],style:{setProperty(){}},classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},toggle(){}},setAttribute(){},append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}});
+const el=id=>{if(!elements.has(id))elements.set(id,makeElement());return elements.get(id)};
 let latest,aborted=0,stopped=0;
 class Recognition{constructor(){latest=this;}start(){}abort(){aborted++;}stop(){stopped++;}}
-const context=vm.createContext({SpeechSession,document:{getElementById:el,querySelectorAll:()=>[]},window:{SpeechRecognition:Recognition,addEventListener(){}},setTimeout,clearTimeout,setInterval,clearInterval,console,TextEncoder,performance:{now:()=>0}});
+const context=vm.createContext({SpeechSession,document:{getElementById:el,querySelectorAll:()=>[],querySelector:()=>null,createElement:makeElement,createTextNode:text=>({textContent:text})},window:{SpeechRecognition:Recognition,addEventListener(){}},cancelAnimationFrame(){},setTimeout,clearTimeout,setInterval,clearInterval,console,TextEncoder,performance:{now:()=>0}});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../voice-feedback.js'),'utf8'),context);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../sketch.js'),'utf8'),context);
 const run=s=>vm.runInContext(s,context),tick=()=>new Promise(r=>setImmediate(r));
 const result=text=>({resultIndex:0,results:[[{transcript:text}]]});
@@ -26,5 +29,9 @@ console.log('PASS prepared Whisper model remains reusable');
 await run("switchVoiceMode('webspeech')");run('startRecording()');latest.onstart();run('linkEpoch++');latest.onresult(result('앞으로'));await tick();assert.equal(run('sent.length'),1);await run("cancel('취소')");
 context.window.SpeechRecognition=undefined;run('startRecording()');assert.match(el('recognitionStatus').textContent,/Whisper/);assert.equal(run('phase'),'idle');
 console.log('PASS changed connection blocks sends; unavailable API guides manual Whisper selection');
+run("device=null;characteristic=null;");await run("sendBluetoothData('forward')");assert.equal(el('sentDataDisplay').dataset.state,'preview');assert.equal(el('sentDataDisplay').children[1].textContent,'forward');assert.equal(el('sentDataDisplay').classList.values.has('send-flash'),false);
+run("device={gatt:{connected:true}};characteristic={writeValue:async()=>{}};phase='listening'");await run("sendBluetoothData('left')");assert.equal(run('phase'),'listening');assert.equal(el('sentDataDisplay').dataset.state,'sent');assert.equal(el('sentDataDisplay').classList.values.has('send-flash'),true);
+run("characteristic={writeValue:async()=>{throw Error('Disconnected')}}");await run("sendBluetoothData('right')");assert.equal(el('sentDataDisplay').dataset.state,'error');assert.equal(el('sentDataDisplay').classList.values.has('send-flash'),false);
+run("voiceMode='whisper';phase='processing';renderVoiceFeedback()");assert.equal(el('voice-recognition-group').dataset.phase,'processing');assert.match(el('recognitionStatus').textContent,/분석/);
+console.log('PASS offline preview, successful write highlight, write failure, listening preservation and Whisper processing feedback');
 })().catch(e=>{console.error(e);process.exitCode=1;});
-

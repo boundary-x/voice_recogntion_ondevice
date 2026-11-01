@@ -114,9 +114,9 @@ async function connectBluetooth(){
 function disconnectBluetooth(){linkEpoch++;characteristic=null;device?.gatt.disconnect();device=null;stateBox('bluetoothStatus','idle','상태: 연결 해제됨');controls();}
 async function sendBluetoothData(data, isCurrent=()=>true){
  if(!isCurrent())return false;
- const c=characteristic;if(!c||!device?.gatt.connected){$('sentDataDisplay').textContent='미전송: 기기를 연결해주세요';return false;}
+ const c=characteristic;if(!c||!device?.gatt.connected){$('sentDataDisplay').textContent='전송할 데이터: '+data;return false;}
  $('sentDataDisplay').textContent='전송 중: '+data;
- try{const bytes=new TextEncoder().encode(data+'\n');if(c.properties?.write&&c.writeValueWithResponse)await c.writeValueWithResponse(bytes);else if(c.properties?.writeWithoutResponse&&c.writeValueWithoutResponse)await c.writeValueWithoutResponse(bytes);else await c.writeValue(bytes);if(isCurrent())$('sentDataDisplay').textContent='전송 완료: '+data;return true;}catch(e){if(isCurrent())$('sentDataDisplay').textContent='전송 실패: '+data+' · '+e.message;return false;}
+ try{const bytes=new TextEncoder().encode(data+'\n');if(c.properties?.write&&c.writeValueWithResponse)await c.writeValueWithResponse(bytes);else if(c.properties?.writeWithoutResponse&&c.writeValueWithoutResponse)await c.writeValueWithoutResponse(bytes);else await c.writeValue(bytes);if(isCurrent())$('sentDataDisplay').textContent='전송됨: '+data;return true;}catch(e){if(isCurrent())$('sentDataDisplay').textContent='전송 실패: '+data+' · '+e.message;return false;}
 }
 function renderVoiceMode(){
  const browser=voiceMode==='webspeech';
@@ -167,5 +167,7 @@ function startBrowserSpeech(){
 }
 window.addEventListener('pagehide',()=>{speechSession?.cancel();clearTimeout(speechTimer);epoch++;activeRequest=null;phase='idle';releaseAudio();worker?.terminate();worker=null;modelReady=modelLoading=false;disconnectBluetooth();});
 window.addEventListener('pageshow',e=>{if(e.persisted){stateBox('modelStatus','idle','모델을 다시 준비해주세요');renderVoiceMode();controls();}});
+
+
 
 

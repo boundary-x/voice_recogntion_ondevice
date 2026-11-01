@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const SpeechSession=require('../speech-session.js');
+const entries=[{phrase:'앞으로',data:'forward'},{phrase:'뒤로',data:'backward'},{phrase:'멈춰',data:'stop'}];
+const tracker=new SpeechSession.CommandTracker(entries);
+const update=text=>tracker.update([{index:0,text}]);
+assert.deepEqual(update('앞으'),[]);
+assert.deepEqual(update('앞으로 움직여'),['forward']);
+assert.deepEqual(update('앞으로 움직여 뒤로 움직여'),['backward']);
+assert.deepEqual(update('앞으로 움직여 뒤로 움직여'),[]);
+assert.deepEqual(update('앞으로 움직여 뒤로 움직여 앞으로'),['forward']);
+assert.deepEqual(update('앞으로'),[]);
+assert.deepEqual(update('앞으로 움직여 뒤로 움직여 앞으로'),[]);
+assert.deepEqual(tracker.update([{index:1,text:'뒤로 움직여 멈춰'}]),['backward','stop']);
+assert.deepEqual(tracker.update([{index:1,text:'뒤로 움직여 멈춰'}]),[]);
+assert.deepEqual(new SpeechSession.CommandTracker(entries).update([{index:0,text:'뒤로 움직였다가 앞으로 움직여'}]),['backward','forward']);
+assert.deepEqual(new SpeechSession.CommandTracker([{phrase:'앞으로 움직여',data:'CUSTOM'},...entries]).commands('앞으로 움직여 뒤로'),['CUSTOM','backward']);
+let recognition,received;
+class Recognition{constructor(){recognition=this;}start(){}abort(){}}
+new SpeechSession(Recognition,{result:(text,segments)=>received={text,segments}}).start();
+recognition.onresult({resultIndex:1,results:[[{transcript:'앞으로'}],[{transcript:'뒤로'}]]});
+assert.equal(received.text,'앞으로 뒤로');assert.deepEqual(received.segments,[{index:1,text:'뒤로'}]);
+console.log('PASS spoken order, cumulative updates, repeated command occurrences, final-result indexes, custom overlap and transcript display');

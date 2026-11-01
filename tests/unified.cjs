@@ -34,4 +34,11 @@ run("device={gatt:{connected:true}};characteristic={writeValue:async()=>{}};phas
 run("characteristic={writeValue:async()=>{throw Error('Disconnected')}}");await run("sendBluetoothData('right')");assert.equal(el('sentDataDisplay').dataset.state,'error');assert.equal(el('sentDataDisplay').classList.values.has('send-flash'),false);
 run("voiceMode='whisper';phase='processing';renderVoiceFeedback()");assert.equal(el('voice-recognition-group').dataset.phase,'processing');assert.match(el('recognitionStatus').textContent,/분석/);
 console.log('PASS offline preview, successful write highlight, write failure, listening preservation and Whisper processing feedback');
+context.window.SpeechRecognition=Recognition;
+run("voiceMode='webspeech';phase='idle';sent=[];characteristic={writeValue:async bytes=>sent.push(new TextDecoder().decode(bytes))};startRecording()");latest.onstart();
+latest.onresult(result('앞으로 움직여'));await tick();assert.deepEqual([...run('sent')],['forward\n']);
+latest.onresult(result('앞으로 움직여 뒤로 움직여'));await tick();assert.deepEqual([...run('sent')],['forward\n','backward\n']);
+latest.onresult(result('앞으로 움직여 뒤로 움직여 앞으로'));latest.onresult(result('앞으로 움직여 뒤로 움직여 앞으로'));await tick();assert.deepEqual([...run('sent')],['forward\n','backward\n','forward\n']);
+await run("cancel('test complete')");
+console.log('PASS held speech sends forward, backward, forward in order without repeated-result writes');
 })().catch(e=>{console.error(e);process.exitCode=1;});

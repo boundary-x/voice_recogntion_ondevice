@@ -48,7 +48,7 @@ It integrates with **BBC Micro:bit** through the **Web Bluetooth API**, sending 
 
 ## 📡 Communication Protocol
 
-After recognition, the app searches for registered phrases contained in the text. Matching normalizes Unicode and removes whitespace. Custom commands are checked first, followed by built-in commands in table order. Whisper sends the first matching output once after analysis. Web Speech checks each incoming result and sends each distinct matching output at most once per press session. A new session can send the same output again.
+After recognition, the app searches for registered phrases contained in the text. Matching normalizes Unicode and removes whitespace. Custom commands are checked first, followed by built-in commands in table order. Whisper sends the first matching output once after analysis. Web Speech sends newly detected command occurrences in spoken order, including repeated commands later in the same press (forward → backward → forward). Cumulative interim/final updates do not replay already consumed occurrences within the same browser result index. Overlapping phrases prefer custom commands, then table order. Interim recognition may be revised by the browser; already transmitted commands cannot be retracted. Multiple commands received in one browser update are queued in order, without an artificial delay.
 
 **Data Format:**
 ```text

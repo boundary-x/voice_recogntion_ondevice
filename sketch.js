@@ -4,7 +4,7 @@ const UART_SERVICE_UUID='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const UART_RX_CHARACTERISTIC_UUID='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const voiceCommands={forward:['전진','앞으로','직진','출발'],backward:['뒤로','후진'],stop:['멈춰','정지','그만'],left:['좌회전','왼쪽','좌측'],right:['우회전','오른쪽','우측'],ring:['사이렌','소리','경보'],name:['이름','너의 이름'],happy:['안녕','반가워'],angry:['혼날래','화났어'],dance:['춤 춰','춤춰','댄스']};
 let heldPointer=null, heldKey=null;
-let voiceMode='webspeech', speechSession=null, speechSent=new Set(), speechQueue=Promise.resolve(), speechTimer=null, speechRequest=null;
+let voiceMode='webspeech', speechSession=null, speechQueue=Promise.resolve(), speechTimer=null, speechRequest=null;
 const voiceReady=()=>voiceMode==='webspeech'||modelReady;
 let userCommands=Object.create(null);
 let worker,modelReady=false,modelLoading=false,phase='idle',epoch=0,linkEpoch=0,requestId=0,activeRequest=null;
@@ -122,7 +122,7 @@ function renderVoiceMode(){
  const browser=voiceMode==='webspeech';
  $('whisper-settings').hidden=browser;$('webspeech-info').hidden=!browser;
  $('voice-instructions').textContent=browser?'버튼을 누른 채 “지금 말하세요” 안내 후 말하세요. 명령이 인식되면 바로 전송합니다.':'버튼을 누른 채 “지금 말하세요” 안내 후 말하고 손을 떼세요. 분석 후 전송합니다.';
- $('voice-hint').textContent=browser?'예: “앞으로 움직여” → forward. 같은 데이터는 한 번 누르는 동안 한 번만 전송합니다. 손을 떼거나 취소해도 로봇 정지 명령은 보내지 않습니다.':'예: “앞으로 움직여” → forward. 여러 명령이 포함되면 첫 일치 항목 하나를 전송합니다. 30초가 지나면 전송 없이 입력을 취소합니다.';
+ $('voice-hint').textContent=browser?'예: “앞으로 움직여” → forward. 새로 인식된 명령을 말한 순서대로 전송합니다. 예: 앞으로 → 뒤로 → 앞으로. 손을 떼거나 취소해도 로봇 정지 명령은 보내지 않습니다.':'예: “앞으로 움직여” → forward. 여러 명령이 포함되면 첫 일치 항목 하나를 전송합니다. 30초가 지나면 전송 없이 입력을 취소합니다.';
  status(browser?'마이크 버튼을 누른 채 말하세요.':modelReady?'모델 준비 완료 · 누른 채 말하고 손을 떼세요.':'모델을 준비한 뒤 마이크 버튼을 누르세요.');
 }
 async function switchVoiceMode(mode){
@@ -139,7 +139,8 @@ function startBrowserSpeech(){
  if(phase!=='idle')return;
  const current=++epoch, link=linkEpoch, commands=commandSnapshot();
  const valid=()=>epoch===current&&voiceMode==='webspeech';
- phase='starting';speechSent=new Set();speechRequest={epoch:current,link};
+ const commandTracker=new SpeechSession.CommandTracker(commands);
+ phase='starting';speechRequest={epoch:current,link};
  $('recognitionResult').textContent='인식 결과: —';showTransmission('idle','—');
  status('버튼을 누른 채, 신호음이 들리면 말하세요.');controls();
  try{
@@ -150,11 +151,10 @@ function startBrowserSpeech(){
        try{const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}catch{}
        startVoiceMeter();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);
      },
-     result(text){if(!valid())return;$('recognitionResult').textContent='인식 결과: '+text;
-       const command=matchCommand(text,commands);if(!command||speechSent.has(command))return;
+     result(text,segments){if(!valid())return;$('recognitionResult').textContent='인식 결과: '+text;
+       const freshCommands=commandTracker.update(segments);if(!freshCommands.length)return;
        if(link!==linkEpoch){$('sentDataDisplay').textContent='미전송: 기기 연결이 변경되었습니다. 다시 말해주세요.';return;}
-       speechSent.add(command);
-       speechQueue=speechQueue.catch(()=>{}).then(()=>sendBluetoothData(command,()=>valid()&&link===linkEpoch));
+       for(const command of freshCommands)speechQueue=speechQueue.catch(()=>{}).then(()=>sendBluetoothData(command,()=>valid()&&link===linkEpoch));
      },
      error(code){if(!valid())return;clearTimeout(speechTimer);epoch++;speechRequest=null;releaseAudio();
        finish(code==='network'?'음성 인식 서비스에 연결하지 못했습니다. Chrome에서 열고 인터넷 연결을 확인한 뒤 다시 시도해주세요. 계속 실패하면 Whisper를 선택해주세요.':code==='not-allowed'?'마이크 권한을 허용한 뒤 다시 시도해주세요.':code==='no-speech'?'말소리를 감지하지 못했어요. 다시 말해주세요.':'음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요. ('+code+')');

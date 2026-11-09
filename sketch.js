@@ -106,9 +106,9 @@ async function connectBluetooth(){
  try{
  if(!navigator.bluetooth)throw Error('이 브라우저는 블루투스 연결을 지원하지 않습니다. 아이폰에서는 Bluefy를 사용하세요.');
  if(device?.gatt.connected)device.gatt.disconnect();characteristic=null;linkEpoch++;
- const selected=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'BBC micro:bit'}],optionalServices:[UART_SERVICE_UUID]});device=selected;
+ const selected=await BoardLink.requestDevice({filters:[{namePrefix:'BBC micro:bit'}],optionalServices:[UART_SERVICE_UUID]});device=selected;
  selected.addEventListener('gattserverdisconnected',()=>{if(device===selected){characteristic=null;linkEpoch++;stateBox('bluetoothStatus','idle','상태: 연결 해제됨');controls();}});
- const server=await selected.gatt.connect();stateBox('bluetoothStatus','loading','상태: 기기 연결됨 · UART 준비 중…');const service=await server.getPrimaryService(UART_SERVICE_UUID);const found=await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);if(!selected.gatt.connected)throw Error('UART 준비 중 연결이 끊어졌습니다');characteristic=found;linkEpoch++;stateBox('bluetoothStatus','connected','상태: '+selected.name+' 연결됨');
+ const server=await selected.gatt.connect();stateBox('bluetoothStatus','loading','상태: 기기 연결됨 · UART 준비 중…');const service=await server.getPrimaryService(UART_SERVICE_UUID);const found=await BoardLink.getCharacteristic(service,UART_RX_CHARACTERISTIC_UUID);if(!selected.gatt.connected)throw Error('UART 준비 중 연결이 끊어졌습니다');characteristic=found;linkEpoch++;stateBox('bluetoothStatus','connected','상태: '+selected.name+' 연결됨');
  }catch(e){characteristic=null;stateBox('bluetoothStatus','error',(device?.gatt.connected?'기기 연결 유지 · UART 준비 실패: ':'연결 실패: ')+e.message);}finally{connecting=false;controls();}
 }
 function disconnectBluetooth(){linkEpoch++;characteristic=null;device?.gatt.disconnect();device=null;stateBox('bluetoothStatus','idle','상태: 연결 해제됨');controls();}

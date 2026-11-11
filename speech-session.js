@@ -4,7 +4,7 @@ class SpeechSession {
   start(language='ko-KR') {
     this.cancel();
     if(!this.Recognition) throw Error('이 브라우저에서 음성 인식을 사용할 수 없습니다. Whisper를 선택해주세요.');
-    const serial=this.serial, r=new this.Recognition(), reducer=new SpeechResultReducer(); this.recognition=r;
+    const serial=this.serial, r=new this.Recognition(), reducer=new SpeechResultReducer(this.handlers.commands||[]); this.recognition=r;
     const current=()=>this.serial===serial && this.recognition===r;
     r.lang=language;r.interimResults=true;r.continuous=true;
     r.onstart=()=>{if(current())this.handlers.start();};
@@ -19,11 +19,20 @@ class SpeechSession {
   stop(){this.recognition?.stop();}
   cancel(){const r=this.recognition;this.serial++;this.recognition=null;try{r?.abort();}catch{}}
 }
-// Map overlapping native results to a stable logical segment. Only a strict
-// prefix extension in the same detected utterance is merged; exact repetitions
-// and suffix/prefix overlaps remain distinct to preserve intentional commands.
+// Merge cumulative results within an utterance. Compare command phrases as well
+// as literal prefixes because Korean endings can change (가 → 갔다).
+// Exact repetitions and suffix-only overlaps remain separate.
 class SpeechResultReducer {
-  constructor(){this.native=new Map();this.next=0;this.utterance=0;this.ended=false;}
+  constructor(commands=[]){this.native=new Map();this.next=0;this.utterance=0;this.ended=false;this.matcher=new SpokenCommandTracker(commands);}
+  extendsCommands(before,after){
+    const oldMatches=this.matcher.matches(before),newMatches=this.matcher.matches(after);
+    // Require additional command occurrences, not just the same command again.
+    // Phrase identity (not output value) preserves custom-command distinctions.
+    return oldMatches.length>0&&newMatches.length>oldMatches.length&&
+      oldMatches.every((m,i)=>m.phrase===newMatches[i].phrase&&m.data===newMatches[i].data)&&
+      SpokenCommandTracker.normalize(before).slice(0,oldMatches[0].end)===
+      SpokenCommandTracker.normalize(after).slice(0,newMatches[0].end);
+  }
   speechStart(){if(this.ended){this.utterance++;this.ended=false;}}
   speechEnd(){this.ended=true;}
   update(results,resultIndex){
@@ -39,7 +48,8 @@ class SpeechResultReducer {
       // An expanded result may revise its ending (움직여 → 움직였다가).
       // Retain earlier prefixes of the same logical group for that case.
       const prefixes=previous?[...this.native.values()].filter(v=>v.group===previous.group&&v.text).map(v=>SpokenCommandTracker.normalize(v.text)):[];
-      const extension=previous&&previous.utterance===this.utterance&&normalized.length>prior.length&&prefixes.some(prefix=>normalized.startsWith(prefix));
+      const extension=previous&&previous.utterance===this.utterance&&
+        ((normalized.length>prior.length&&prefixes.some(prefix=>normalized.startsWith(prefix)))||this.extendsCommands(previous.text,text));
       const group=extension?previous.group:this.next++;
       this.native.set(i,{index:i,group,utterance:this.utterance,text});changed.add(group);
     }
@@ -53,13 +63,14 @@ class SpeechResultReducer {
 class SpokenCommandTracker {
   constructor(entries){this.entries=entries.map((entry,priority)=>({...entry,priority,phrase:SpokenCommandTracker.normalize(entry.phrase)})).filter(e=>e.phrase);this.consumed=new Map();}
   static normalize(text){return text.normalize('NFC').replace(/\s+/g,'');}
-  commands(text){
+  matches(text){
     const value=SpokenCommandTracker.normalize(text),accepted=[];
     // Custom entries come first, resolving overlapping phrases before sorting
     // distinct matches into spoken order. This preserves user-command priority.
-    for(const entry of this.entries){let start=0;while((start=value.indexOf(entry.phrase,start))!==-1){const end=start+entry.phrase.length;if(!accepted.some(m=>start<m.end&&end>m.start))accepted.push({start,end,data:entry.data});start=end;}}
-    return accepted.sort((a,b)=>a.start-b.start).map(m=>m.data);
+    for(const entry of this.entries){let start=0;while((start=value.indexOf(entry.phrase,start))!==-1){const end=start+entry.phrase.length;if(!accepted.some(m=>start<m.end&&end>m.start))accepted.push({start,end,data:entry.data,phrase:entry.phrase});start=end;}}
+    return accepted.sort((a,b)=>a.start-b.start);
   }
+  commands(text){return this.matches(text).map(m=>m.data);}
   update(segments){
     const fresh=[];
     for(const segment of [...segments].sort((a,b)=>a.index-b.index)){

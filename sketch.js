@@ -148,6 +148,7 @@ function startBrowserSpeech(){
    // Resume audio inside the press gesture so the ready beep can play on mobile.
    try{context=new (window.AudioContext||window.webkitAudioContext)();context.resume().catch(()=>{});}catch{}
    speechSession=new SpeechSession(window.SpeechRecognition||window.webkitSpeechRecognition,{
+     commands,
      start(){if(!valid())return;phase='listening';status('지금 말하세요.');controls();
        try{const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}catch{}
        resetVoiceFeedback();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);

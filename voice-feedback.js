@@ -1,5 +1,5 @@
-/* Voice interaction feedback. Audio level is feedback, not recognition confidence. */
-let meterStream=null,meterSource=null,meterAnalyser=null,meterFrame=0,meterGeneration=0,sendFlashTimer=null;
+/* Web Speech uses recognition events only; Whisper uses its existing recording audio. */
+let sendFlashTimer=null;
 function initVoiceFeedback(){
  const card=$('voice-recognition-group');
  const badge=document.createElement('span');badge.id='voice-mode-badge';card.querySelector('h3').append(badge);
@@ -32,19 +32,11 @@ function setVoiceLevel(rms){
  const ring=document.querySelector('.voice-ring');if(!ring)return;
  ring.style.setProperty('--voice-scale',String(1+Math.min(.28,Math.max(0,rms)*4)));
 }
-function stopVoiceMeter(){
- meterGeneration++;cancelAnimationFrame(meterFrame);meterStream?.getTracks().forEach(t=>t.stop());meterSource?.disconnect();meterAnalyser?.disconnect();meterStream=meterSource=meterAnalyser=null;setVoiceLevel(0);
-}
-async function startVoiceMeter(){
- stopVoiceMeter();const token=meterGeneration,ctx=context;
- if(!ctx||!navigator.mediaDevices?.getUserMedia)return;
- try{
-  const audio=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-  if(token!==meterGeneration||phase!=='listening'||voiceMode!=='webspeech'||ctx!==context){audio.getTracks().forEach(t=>t.stop());return;}
-  meterStream=audio;meterSource=ctx.createMediaStreamSource(audio);meterAnalyser=ctx.createAnalyser();meterAnalyser.fftSize=256;meterSource.connect(meterAnalyser);
-  const samples=new Float32Array(meterAnalyser.fftSize);
-  function tick(){if(token!==meterGeneration||phase!=='listening')return;meterAnalyser.getFloatTimeDomainData(samples);setVoiceLevel(Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length));meterFrame=requestAnimationFrame(tick);}tick();
- }catch{if(token===meterGeneration)stopVoiceMeter();/* Meter failure must not stop speech recognition. */}
+function resetVoiceFeedback(){setVoiceLevel(0);}
+function setSpeechActivity(active){
+ // No extra audio capture: some Android devices cannot share the STT microphone.
+ if(voiceMode!=='webspeech'||phase!=='listening')return;
+ setVoiceLevel(active?.07:0);
 }
 function showTransmission(state,data,detail=''){
  const box=$('sentDataDisplay');clearTimeout(sendFlashTimer);box.classList.remove('send-flash');box.dataset.state=state;

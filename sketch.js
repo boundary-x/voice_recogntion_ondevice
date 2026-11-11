@@ -70,7 +70,7 @@ function matchCommand(text,entries=commandSnapshot()){
  return entries.find(item=>normalized.includes(item.phrase.normalize('NFC').replace(/\s+/g,'')))?.data||null;
 }
 async function releaseAudio(){
- stopVoiceMeter();clearInterval(timer);const ctx=context;stream?.getTracks().forEach(t=>t.stop());processor?.disconnect();source?.disconnect();gain?.disconnect();stream=context=processor=source=gain=null;if(ctx&&ctx.state!=='closed')await ctx.close();
+ resetVoiceFeedback();clearInterval(timer);const ctx=context;stream?.getTracks().forEach(t=>t.stop());processor?.disconnect();source?.disconnect();gain?.disconnect();stream=context=processor=source=gain=null;if(ctx&&ctx.state!=='closed')await ctx.close();
 }
 async function cancel(message){
  clearTimeout(speechTimer);speechSession?.cancel();speechRequest=null;
@@ -94,7 +94,7 @@ async function startRecording(){
  }catch(e){if(current!==epoch)return;await releaseAudio();activeRequest=null;finish('마이크를 열 수 없습니다: '+e.message);}
 }
 async function stopRecording(){
- if(voiceMode==='webspeech'){if(phase==='listening'){phase='processing';stopVoiceMeter();status('마지막 인식 결과를 확인하고 있습니다…');controls();try{speechSession?.stop();}catch{finish('다시 말해주세요.');}clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('입력을 마쳤습니다. 다시 말할 수 있어요.'),8000);}return;}
+ if(voiceMode==='webspeech'){if(phase==='listening'){phase='processing';resetVoiceFeedback();status('마지막 인식 결과를 확인하고 있습니다…');controls();try{speechSession?.stop();}catch{finish('다시 말해주세요.');}clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('입력을 마쳤습니다. 다시 말할 수 있어요.'),8000);}return;}
  if(phase!=='listening')return;phase='processing';controls();status('음성을 분석하고 있어요…');const current=epoch,rate=context.sampleRate,hasVoice=voiced;
  const merged=new Float32Array(chunks.reduce((n,c)=>n+c.length,0));let offset=0;for(const chunk of chunks){merged.set(chunk,offset);offset+=chunk.length;}
  await releaseAudio();if(current!==epoch)return;
@@ -140,6 +140,7 @@ function startBrowserSpeech(){
  const current=++epoch, link=linkEpoch, commands=commandSnapshot();
  const valid=()=>epoch===current&&voiceMode==='webspeech';
  const commandTracker=new SpeechSession.CommandTracker(commands);
+ let receivedText=false;
  phase='starting';speechRequest={epoch:current,link};
  $('recognitionResult').textContent='인식 결과: —';showTransmission('idle','—');
  status('버튼을 누른 채, 신호음이 들리면 말하세요.');controls();
@@ -149,9 +150,10 @@ function startBrowserSpeech(){
    speechSession=new SpeechSession(window.SpeechRecognition||window.webkitSpeechRecognition,{
      start(){if(!valid())return;phase='listening';status('지금 말하세요.');controls();
        try{const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}catch{}
-       startVoiceMeter();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);
+       resetVoiceFeedback();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);
      },
-     result(text,segments){if(!valid())return;$('recognitionResult').textContent='인식 결과: '+text;
+     speech(active){if(valid())setSpeechActivity(active);},
+     result(text,segments){if(!valid())return;receivedText=receivedText||!!text.trim();$('recognitionResult').textContent='인식 결과: '+text;
        const freshCommands=commandTracker.update(segments);if(!freshCommands.length)return;
        if(link!==linkEpoch){$('sentDataDisplay').textContent='미전송: 기기 연결이 변경되었습니다. 다시 말해주세요.';return;}
        for(const command of freshCommands)speechQueue=speechQueue.catch(()=>{}).then(()=>sendBluetoothData(command,()=>valid()&&link===linkEpoch));
@@ -159,7 +161,7 @@ function startBrowserSpeech(){
      error(code){if(!valid())return;clearTimeout(speechTimer);epoch++;speechRequest=null;releaseAudio();
        finish(code==='network'?'음성 인식 서비스에 연결하지 못했습니다. Chrome에서 열고 인터넷 연결을 확인한 뒤 다시 시도해주세요. 계속 실패하면 Whisper를 선택해주세요.':code==='not-allowed'?'마이크 권한을 허용한 뒤 다시 시도해주세요.':code==='no-speech'?'말소리를 감지하지 못했어요. 다시 말해주세요.':'음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요. ('+code+')');
      },
-     end(){if(!valid())return;clearTimeout(speechTimer);speechRequest=null;releaseAudio();finish('입력을 마쳤습니다. 다시 누르고 말할 수 있어요.');}
+     end(){if(!valid())return;clearTimeout(speechTimer);speechRequest=null;releaseAudio();finish(receivedText?'입력을 마쳤습니다. 다시 누르고 말할 수 있어요.':'인식된 말이 없습니다. 버튼을 누른 채 신호음이 들리면 다시 말해주세요.');}
    });
    speechSession.start('ko-KR');
    speechTimer=setTimeout(()=>cancel('음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요.'),10000);

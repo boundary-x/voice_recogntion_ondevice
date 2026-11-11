@@ -8,6 +8,9 @@ class SpeechSession {
     const current=()=>this.serial===serial && this.recognition===r;
     r.lang=language;r.interimResults=true;r.continuous=true;
     r.onstart=()=>{if(current())this.handlers.start();};
+    r.onspeechstart=()=>{if(current())this.handlers.speech?.(true);};
+    r.onspeechend=()=>{if(current())this.handlers.speech?.(false);};
+    r.onaudioend=()=>{if(current())this.handlers.speech?.(false);};
     r.onresult=e=>{if(!current())return;const segments=[];let text='';for(let i=0;i<e.results.length;i++){const transcript=e.results[i][0].transcript;text+=transcript+' ';if(i>=e.resultIndex)segments.push({index:i,text:transcript});}this.handlers.result(text.trim(),segments);};
     r.onerror=e=>{if(!current())return;this.cancel();this.handlers.error(e.error);};
     r.onend=()=>{if(!current())return;this.recognition=null;this.handlers.end();};

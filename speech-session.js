@@ -4,20 +4,49 @@ class SpeechSession {
   start(language='ko-KR') {
     this.cancel();
     if(!this.Recognition) throw Error('이 브라우저에서 음성 인식을 사용할 수 없습니다. Whisper를 선택해주세요.');
-    const serial=this.serial, r=new this.Recognition(); this.recognition=r;
+    const serial=this.serial, r=new this.Recognition(), reducer=new SpeechResultReducer(); this.recognition=r;
     const current=()=>this.serial===serial && this.recognition===r;
     r.lang=language;r.interimResults=true;r.continuous=true;
     r.onstart=()=>{if(current())this.handlers.start();};
-    r.onspeechstart=()=>{if(current())this.handlers.speech?.(true);};
-    r.onspeechend=()=>{if(current())this.handlers.speech?.(false);};
+    r.onspeechstart=()=>{if(current()){reducer.speechStart();this.handlers.speech?.(true);}};
+    r.onspeechend=()=>{if(current()){reducer.speechEnd();this.handlers.speech?.(false);}};
     r.onaudioend=()=>{if(current())this.handlers.speech?.(false);};
-    r.onresult=e=>{if(!current())return;const segments=[];let text='';for(let i=0;i<e.results.length;i++){const transcript=e.results[i][0].transcript;text+=transcript+' ';if(i>=e.resultIndex)segments.push({index:i,text:transcript});}this.handlers.result(text.trim(),segments);};
+    r.onresult=e=>{if(!current())return;const result=reducer.update(e.results,e.resultIndex);this.handlers.result(result.text,result.segments);};
     r.onerror=e=>{if(!current())return;this.cancel();this.handlers.error(e.error);};
     r.onend=()=>{if(!current())return;this.recognition=null;this.handlers.end();};
     try{r.start();}catch(e){this.cancel();throw e;}
   }
   stop(){this.recognition?.stop();}
   cancel(){const r=this.recognition;this.serial++;this.recognition=null;try{r?.abort();}catch{}}
+}
+// Map overlapping native results to a stable logical segment. Only a strict
+// prefix extension in the same detected utterance is merged; exact repetitions
+// and suffix/prefix overlaps remain distinct to preserve intentional commands.
+class SpeechResultReducer {
+  constructor(){this.native=new Map();this.next=0;this.utterance=0;this.ended=false;}
+  speechStart(){if(this.ended){this.utterance++;this.ended=false;}}
+  speechEnd(){this.ended=true;}
+  update(results,resultIndex){
+    for(const index of this.native.keys())if(index>=results.length)this.native.delete(index);
+    const changed=new Set();
+    for(let i=0;i<results.length;i++){
+      if(i<resultIndex&&this.native.has(i))continue;
+      const text=results[i][0].transcript.trim(),existing=this.native.get(i);
+      if(existing){existing.text=text;changed.add(existing.group);continue;}
+      if(!text)continue;
+      const previous=[...this.native.values()].filter(v=>v.index<i&&v.text).sort((a,b)=>b.index-a.index)[0];
+      const normalized=SpokenCommandTracker.normalize(text),prior=previous?SpokenCommandTracker.normalize(previous.text):'';
+      // An expanded result may revise its ending (움직여 → 움직였다가).
+      // Retain earlier prefixes of the same logical group for that case.
+      const prefixes=previous?[...this.native.values()].filter(v=>v.group===previous.group&&v.text).map(v=>SpokenCommandTracker.normalize(v.text)):[];
+      const extension=previous&&previous.utterance===this.utterance&&normalized.length>prior.length&&prefixes.some(prefix=>normalized.startsWith(prefix));
+      const group=extension?previous.group:this.next++;
+      this.native.set(i,{index:i,group,utterance:this.utterance,text});changed.add(group);
+    }
+    const groups=new Map();
+    for(const entry of [...this.native.values()].sort((a,b)=>a.index-b.index))groups.set(entry.group,entry.text);
+    return {text:[...groups.values()].filter(Boolean).join(' '),segments:[...groups].filter(([index])=>changed.has(index)).map(([index,text])=>({index,text}))};
+  }
 }
 // Browser results are cumulative within each result index. Consume command
 // occurrences, not distinct output values, so a later repeated command can run.
@@ -44,4 +73,5 @@ class SpokenCommandTracker {
   }
 }
 SpeechSession.CommandTracker=SpokenCommandTracker;
+SpeechSession.ResultReducer=SpeechResultReducer;
 if(typeof module!=='undefined')module.exports=SpeechSession;

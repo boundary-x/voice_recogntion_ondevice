@@ -10,8 +10,9 @@ assert.equal(h.feed(['','','','','','앞으로','앞으로 움직여','앞으로
 h=harness();h.r.speechStart();h.feed(['앞으로']);h.r.speechEnd();h.feed(['앞으로','앞으로 움직여'],1);assert.deepEqual(h.sent,['forward']);
 // A new utterance must not be merged even if it extends the old phrase.
 h.r.speechStart();h.feed(['앞으로','앞으로 움직여','앞으로 움직여 주세요'],2);assert.deepEqual(h.sent,['forward','forward']);
-// Preserve intentional repetitions within and across native segments.
-h=harness();h.feed(['앞으로']);h.feed(['앞으로','앞으로'],1);assert.deepEqual(h.sent,['forward','forward']);
+// Identical native snapshots within one utterance collapse; repeated words remain.
+h=harness();h.feed(['앞으로']);assert.equal(h.feed(['앞으로','앞으로'],1),'앞으로');assert.deepEqual(h.sent,['forward']);
+h.r.speechEnd();h.r.speechStart();h.feed(['앞으로','앞으로','앞으로'],2);assert.deepEqual(h.sent,['forward','forward']);
 h=harness();h.feed(['앞으로']);h.feed(['앞으로 앞으로'],0);assert.deepEqual(h.sent,['forward','forward']);
 // Revisions/finalization of one native result do not re-send.
 h=harness();h.feed(['앞으로']);h.feed(['앞으로 움직여']);h.feed(['앞으로 움직여']);assert.deepEqual(h.sent,['forward']);
@@ -45,3 +46,16 @@ actual=[];const tracker2=new SpeechSession.CommandTracker(commands),session2=new
 session2.start();recognizer.onspeechstart();cumulative=[];for(const phrase of phrases){cumulative.push(phrase);event(cumulative,cumulative.length-1);}
 assert.equal(display,phrases.at(-1));assert.deepEqual(actual,['forward','backward','forward','backward']);session2.cancel();
 console.log('PASS: real SpeechSession command snapshot integration');
+
+// Exact Android snapshots supplied by the user; no UA/device identifiers stored.
+for(const fixture of require('./android-cumulative-fixture.json')){
+ const emissions=[],displayed=[],tr=new SpeechSession.CommandTracker(commands);
+ const appSession=new SpeechSession(Fake,{commands,start(){},result(text,segments){displayed.push(text);emissions.push(...tr.update(segments));},end(){},error(code){throw Error(code)}});
+ appSession.start();recognizer.onspeechstart();
+ for(const e of fixture.events){recognizer.onresult({resultIndex:e.resultIndex,results:e.results.map(v=>Object.assign([{transcript:v.text}],{isFinal:v.isFinal}))});}
+ recognizer.onspeechend();recognizer.onaudioend();recognizer.onend();
+ assert.deepEqual(emissions,['forward','backward','forward']);
+ assert.equal(displayed.at(-1),fixture.events.at(-1).results.at(-1).text);
+ assert.equal(emissions.length,3);
+ console.log('PASS: exact Android trace '+fixture.test+' => '+emissions.join(' → '));
+}

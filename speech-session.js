@@ -21,7 +21,9 @@ class SpeechSession {
 }
 // Merge cumulative results within an utterance. Compare command phrases as well
 // as literal prefixes because Korean endings can change (가 → 갔다).
-// Exact repetitions and suffix-only overlaps remain separate.
+// Identical snapshots in the same utterance are duplicates too: Android may
+// append the same final transcript under a new native index repeatedly.
+// A speechend → speechstart boundary allows the same command again.
 class SpeechResultReducer {
   constructor(commands=[]){this.native=new Map();this.next=0;this.utterance=0;this.ended=false;this.matcher=new SpokenCommandTracker(commands);}
   extendsCommands(before,after){
@@ -49,7 +51,7 @@ class SpeechResultReducer {
       // Retain earlier prefixes of the same logical group for that case.
       const prefixes=previous?[...this.native.values()].filter(v=>v.group===previous.group&&v.text).map(v=>SpokenCommandTracker.normalize(v.text)):[];
       const extension=previous&&previous.utterance===this.utterance&&
-        ((normalized.length>prior.length&&prefixes.some(prefix=>normalized.startsWith(prefix)))||this.extendsCommands(previous.text,text));
+        ((normalized.length>=prior.length&&prefixes.some(prefix=>normalized.startsWith(prefix)))||this.extendsCommands(previous.text,text));
       const group=extension?previous.group:this.next++;
       this.native.set(i,{index:i,group,utterance:this.utterance,text});changed.add(group);
     }

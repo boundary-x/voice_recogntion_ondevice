@@ -1,23 +1,54 @@
-/* One browser-recognition session; late results are ignored after cancellation. */
+/* Browser STT: live results while held, restart only after normal service end. */
 class SpeechSession {
-  constructor(Recognition, handlers) { this.Recognition=Recognition; this.handlers=handlers; this.serial=0; }
+  constructor(Recognition, handlers) { this.Recognition=Recognition; this.handlers=handlers; this.serial=0; this.restartTimer=null; }
   start(language='ko-KR') {
     this.cancel();
     if(!this.Recognition) throw Error('이 브라우저에서 음성 인식을 사용할 수 없습니다. Whisper를 선택해주세요.');
-    const serial=this.serial, r=new this.Recognition(), reducer=new SpeechResultReducer(this.handlers.commands||[]); this.recognition=r;
-    const current=()=>this.serial===serial && this.recognition===r;
-    r.lang=language;r.interimResults=true;r.continuous=true;
-    r.onstart=()=>{if(current())this.handlers.start();};
-    r.onspeechstart=()=>{if(current()){reducer.speechStart();this.handlers.speech?.(true);}};
-    r.onspeechend=()=>{if(current()){reducer.speechEnd();this.handlers.speech?.(false);}};
-    r.onaudioend=()=>{if(current())this.handlers.speech?.(false);};
-    r.onresult=e=>{if(!current())return;const result=reducer.update(e.results,e.resultIndex);this.handlers.result(result.text,result.segments);};
-    r.onerror=e=>{if(!current())return;this.cancel();this.handlers.error(e.error);};
-    r.onend=()=>{if(!current())return;this.recognition=null;this.handlers.end();};
-    try{r.start();}catch(e){this.cancel();throw e;}
+    const serial=this.serial;this.stopped=false;
+    let completed='',base=0,rapidEnds=0;
+    const valid=()=>this.serial===serial;
+    const begin=()=>{
+      if(!valid()||this.stopped)return;
+      this.restartTimer=null;
+      const r=new this.Recognition(),reducer=new SpeechResultReducer(this.handlers.commands||[]);
+      this.recognition=r;let lastText='',nextBase=base,started=Date.now();
+      const current=()=>valid()&&this.recognition===r;
+      r.lang=language;r.interimResults=true;r.continuous=true;
+      r.onstart=()=>{if(current())this.handlers.start();};
+      r.onspeechstart=()=>{if(current()){reducer.speechStart();this.handlers.speech?.(true);}};
+      r.onspeechend=()=>{if(current()){reducer.speechEnd();this.handlers.speech?.(false);}};
+      r.onaudioend=()=>{if(current())this.handlers.speech?.(false);};
+      r.onresult=e=>{
+        if(!current())return;
+        const result=reducer.update(e.results,e.resultIndex);lastText=result.text;
+        const segments=result.segments.map(s=>({index:base+s.index,text:s.text}));
+        for(const s of segments)nextBase=Math.max(nextBase,s.index+1);
+        this.handlers.result([completed,lastText].filter(Boolean).join(' '),segments);
+      };
+      r.onerror=e=>{if(!current())return;this.cancel();this.handlers.error(e.error);};
+      r.onend=()=>{
+        if(!current())return;this.recognition=null;
+        if(!this.stopped&&this.handlers.shouldContinue?.()){
+          rapidEnds=!lastText&&Date.now()-started<1000?rapidEnds+1:0;
+          if(rapidEnds>=3){this.cancel();this.handlers.error('restart-loop');return;}
+          completed=[completed,lastText].filter(Boolean).join(' ');base=nextBase;
+          this.handlers.restarting?.();
+          this.restartTimer=setTimeout(()=>{
+            if(!valid()||this.stopped)return;
+            if(!this.handlers.shouldContinue?.()){this.stopped=true;this.handlers.end();return;}
+            try{begin();}catch(e){if(valid()){this.cancel();this.handlers.error(e.name||'start-failed');}}
+          },150);
+        }else{this.stopped=true;this.handlers.end();}
+      };
+      r.start();
+    };
+    try{begin();}catch(e){this.cancel();throw e;}
   }
-  stop(){this.recognition?.stop();}
-  cancel(){const r=this.recognition;this.serial++;this.recognition=null;try{r?.abort();}catch{}}
+  stop(){
+    this.stopped=true;clearTimeout(this.restartTimer);this.restartTimer=null;
+    if(this.recognition)this.recognition.stop();else this.handlers.end();
+  }
+  cancel(){clearTimeout(this.restartTimer);this.restartTimer=null;this.stopped=true;const r=this.recognition;this.serial++;this.recognition=null;try{r?.abort();}catch{}}
 }
 // Merge cumulative results within an utterance. Compare command phrases as well
 // as literal prefixes because Korean endings can change (가 → 갔다).

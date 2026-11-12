@@ -32,7 +32,7 @@ function setup(){
 }
 function bindHoldInput(){
  const mic=$('mic');
- const release=()=>{if(phase==='starting')cancel('너무 빨리 떼었어요. 준비 안내가 나올 때까지 누른 채 기다리고 말해주세요.');else if(phase==='listening')stopRecording();};
+ const release=()=>{if(phase==='starting')cancel(speechRequest?.restarting?'음성 입력을 마쳤습니다.':'너무 빨리 떼었어요. 준비 안내가 나올 때까지 누른 채 기다리고 말해주세요.');else if(phase==='listening')stopRecording();};
  mic.addEventListener('pointerdown',e=>{if(e.button!==0||!e.isPrimary||phase!=='idle'||!voiceReady()||heldKey!==null)return;e.preventDefault();heldPointer=e.pointerId;mic.setPointerCapture(e.pointerId);startRecording();});
  mic.addEventListener('pointerup',e=>{if(e.pointerId!==heldPointer)return;e.preventDefault();heldPointer=null;release();});
  const abort=e=>{if(e.pointerId!==heldPointer)return;heldPointer=null;if(['starting','listening'].includes(phase))cancel('입력이 취소되었습니다. 버튼을 다시 누르고 말해주세요.');};
@@ -94,7 +94,7 @@ async function startRecording(){
  }catch(e){if(current!==epoch)return;await releaseAudio();activeRequest=null;finish('마이크를 열 수 없습니다: '+e.message);}
 }
 async function stopRecording(){
- if(voiceMode==='webspeech'){if(phase==='listening'){phase='processing';resetVoiceFeedback();status('마지막 인식 결과를 확인하고 있습니다…');controls();try{speechSession?.stop();}catch{finish('다시 말해주세요.');}clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('입력을 마쳤습니다. 다시 말할 수 있어요.'),8000);}return;}
+ if(voiceMode==='webspeech'){if(phase==='listening'){phase='processing';resetVoiceFeedback();status('마지막 인식 결과를 확인하고 있습니다…');controls();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('입력을 마쳤습니다. 다시 말할 수 있어요.'),8000);try{speechSession?.stop();}catch{cancel('다시 말해주세요.');}}return;}
  if(phase!=='listening')return;phase='processing';controls();status('음성을 분석하고 있어요…');const current=epoch,rate=context.sampleRate,hasVoice=voiced;
  const merged=new Float32Array(chunks.reduce((n,c)=>n+c.length,0));let offset=0;for(const chunk of chunks){merged.set(chunk,offset);offset+=chunk.length;}
  await releaseAudio();if(current!==epoch)return;
@@ -140,7 +140,7 @@ function startBrowserSpeech(){
  const current=++epoch, link=linkEpoch, commands=commandSnapshot();
  const valid=()=>epoch===current&&voiceMode==='webspeech';
  const commandTracker=new SpeechSession.CommandTracker(commands);
- let receivedText=false;
+ let receivedText=false,readyBeepPlayed=false;
  phase='starting';speechRequest={epoch:current,link};
  $('recognitionResult').textContent='인식 결과: —';showTransmission('idle','—');
  status('버튼을 누른 채, 신호음이 들리면 말하세요.');controls();
@@ -149,9 +149,11 @@ function startBrowserSpeech(){
    try{context=new (window.AudioContext||window.webkitAudioContext)();context.resume().catch(()=>{});}catch{}
    speechSession=new SpeechSession(window.SpeechRecognition||window.webkitSpeechRecognition,{
      commands,
+     shouldContinue(){return valid()&&(heldPointer!==null||heldKey!==null)&&!document.hidden&&['starting','listening'].includes(phase);},
+     restarting(){if(!valid())return;phase='starting';speechRequest.restarting=true;resetVoiceFeedback();controls();status('음성 입력을 이어가는 중입니다. 잠시 기다려주세요.');clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('음성 입력을 다시 시작하지 못했습니다. 버튼을 다시 눌러주세요.'),10000);},
      start(){if(!valid())return;phase='listening';status('지금 말하세요.');controls();
-       try{const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}catch{}
-       resetVoiceFeedback();clearTimeout(speechTimer);speechTimer=setTimeout(()=>cancel('30초가 지나 음성 입력을 끝냈습니다. 이미 전송된 명령은 취소되지 않습니다.'),30000);
+       try{if(!readyBeepPlayed){readyBeepPlayed=true;const tone=context.createOscillator(),volume=context.createGain();volume.gain.value=.08;tone.frequency.value=880;tone.connect(volume);volume.connect(context.destination);tone.start();tone.stop(context.currentTime+.1);}}catch{}
+       resetVoiceFeedback();clearTimeout(speechTimer);if(speechRequest)speechRequest.restarting=false;
      },
      speech(active){if(valid())setSpeechActivity(active);},
      result(text,segments){if(!valid())return;receivedText=receivedText||!!text.trim();$('recognitionResult').textContent='인식 결과: '+text;
@@ -160,7 +162,7 @@ function startBrowserSpeech(){
        for(const command of freshCommands)speechQueue=speechQueue.catch(()=>{}).then(()=>sendBluetoothData(command,()=>valid()&&link===linkEpoch));
      },
      error(code){if(!valid())return;clearTimeout(speechTimer);epoch++;speechRequest=null;releaseAudio();
-       finish(code==='network'?'음성 인식 서비스에 연결하지 못했습니다. Chrome에서 열고 인터넷 연결을 확인한 뒤 다시 시도해주세요. 계속 실패하면 Whisper를 선택해주세요.':code==='not-allowed'?'마이크 권한을 허용한 뒤 다시 시도해주세요.':code==='no-speech'?'말소리를 감지하지 못했어요. 다시 말해주세요.':'음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요. ('+code+')');
+       finish(code==='restart-loop'?'음성 인식 서비스가 반복해서 종료됐습니다. 버튼을 다시 눌러주세요.':code==='network'?'음성 인식 서비스에 연결하지 못했습니다. Chrome에서 열고 인터넷 연결을 확인한 뒤 다시 시도해주세요. 계속 실패하면 Whisper를 선택해주세요.':code==='not-allowed'?'마이크 권한을 허용한 뒤 다시 시도해주세요.':code==='no-speech'?'말소리를 감지하지 못했어요. 다시 말해주세요.':'음성 인식을 시작할 수 없습니다. Whisper 방식으로 변경해보세요. ('+code+')');
      },
      end(){if(!valid())return;clearTimeout(speechTimer);speechRequest=null;releaseAudio();finish(receivedText?'입력을 마쳤습니다. 다시 누르고 말할 수 있어요.':'인식된 말이 없습니다. 버튼을 누른 채 신호음이 들리면 다시 말해주세요.');}
    });
